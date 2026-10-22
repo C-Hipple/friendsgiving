@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -46,6 +48,16 @@ CREATE TABLE IF NOT EXISTS replies (
 	created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS replies_by_thread ON replies (thread_id, created_at);
+
+CREATE TABLE IF NOT EXISTS post_log (
+	id         INTEGER PRIMARY KEY,
+	created_at INTEGER NOT NULL,
+	path       TEXT    NOT NULL,
+	status     INTEGER NOT NULL,
+	user_name  TEXT    NOT NULL,
+	ip         TEXT    NOT NULL,
+	form       TEXT    NOT NULL
+);
 `
 
 type Store struct {
@@ -340,4 +352,118 @@ func (s *Store) Counts(ctx context.Context) (Counts, error) {
 		c.LastPost, c.HasPosted = time.Unix(last.Int64, 0), true
 	}
 	return c, err
+}
+
+// PostLog is one POST request as the audit log saw it. Form holds the
+// submitted fields, with any password redacted.
+type PostLog struct {
+	ID     int64
+	At     time.Time
+	Path   string
+	Status int
+	User   string
+	IP     string
+	Form   url.Values
+}
+
+func (s *Store) LogPost(ctx context.Context, p PostLog) error {
+	form, err := json.Marshal(p.Form)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx,
+		`INSERT INTO post_log (created_at, path, status, user_name, ip, form) VALUES (?, ?, ?, ?, ?, ?)`,
+		time.Now().Unix(), p.Path, p.Status, p.User, p.IP, string(form))
+	return err
+}
+
+// LogFilter narrows the post log. Each non-empty field must appear, ignoring
+// case, in its column; Text searches the submitted values, not field names.
+type LogFilter struct {
+	User string
+	Path string
+	IP   string
+	Text string
+}
+
+func (f LogFilter) Active() bool { return f != (LogFilter{}) }
+
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+// PostLogs returns up to limit entries matching f, newest first, and how
+// many match in all.
+func (s *Store) PostLogs(ctx context.Context, f LogFilter, limit int) ([]PostLog, int, error) {
+	var where []string
+	var args []any
+	contains := func(cond, v string) {
+		if v != "" {
+			where = append(where, cond)
+			args = append(args, "%"+likeEscaper.Replace(v)+"%")
+		}
+	}
+	contains(`user_name LIKE ? ESCAPE '\'`, f.User)
+	contains(`path LIKE ? ESCAPE '\'`, f.Path)
+	contains(`ip LIKE ? ESCAPE '\'`, f.IP)
+	contains(`EXISTS (SELECT 1 FROM json_tree(form) WHERE type = 'text' AND value LIKE ? ESCAPE '\')`, f.Text)
+	cond := ""
+	if len(where) > 0 {
+		cond = " WHERE " + strings.Join(where, " AND ")
+	}
+
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM post_log`+cond, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, created_at, path, status, user_name, ip, form FROM post_log`+cond+` ORDER BY id DESC LIMIT ?`,
+		append(args, limit)...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var out []PostLog
+	for rows.Next() {
+		var p PostLog
+		var created int64
+		var form string
+		if err := rows.Scan(&p.ID, &created, &p.Path, &p.Status, &p.User, &p.IP, &form); err != nil {
+			return nil, 0, err
+		}
+		p.At = time.Unix(created, 0)
+		if err := json.Unmarshal([]byte(form), &p.Form); err != nil {
+			return nil, 0, err
+		}
+		out = append(out, p)
+	}
+	return out, total, rows.Err()
+}
+
+// PostLogSuggestions lists the names, paths, and IPs seen in the post log,
+// most frequent first, to offer as filter values.
+func (s *Store) PostLogSuggestions(ctx context.Context) (users, paths, ips []string, err error) {
+	distinct := func(col string) ([]string, error) {
+		rows, err := s.db.QueryContext(ctx,
+			`SELECT `+col+` FROM post_log WHERE `+col+` != '' GROUP BY `+col+` ORDER BY COUNT(*) DESC, `+col)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		var out []string
+		for rows.Next() {
+			var v string
+			if err := rows.Scan(&v); err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		return out, rows.Err()
+	}
+	if users, err = distinct("user_name"); err != nil {
+		return
+	}
+	if paths, err = distinct("path"); err != nil {
+		return
+	}
+	ips, err = distinct("ip")
+	return
 }
