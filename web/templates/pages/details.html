@@ -1,45 +1,151 @@
-{{define "content"}}{{$m := .Page}}
-<section class="page-head">
-  <div class="wrap">
-    <div class="head-card">
-      <div class="head-row">
-        <div>
-          <span class="eyebrow-pill">{{icon "info"}} The plan</span>
-          <h1 class="display">Event Details</h1>
-          <p class="lead">Everything you need to know to show up hungry for {{.Event.Name}}.{{if or (tbd .Event.Date) (tbd .Event.Location)}} A few details are still cooking. We'll update this page as soon as they're set.{{end}}</p>
-        </div>
-        <div class="head-chips">
-          <div class="mini-stat">{{icon "calendar-month" "ink-pumpkin"}}<div><span class="label-sm muted">Date</span><strong>{{if tbd .Event.Date}}TBD{{else}}{{.Event.Date}}{{end}}</strong></div></div>
-          <div class="mini-stat">{{icon "location-on" "ink-cranberry"}}<div><span class="label-sm muted">Location</span><strong>{{if tbd .Event.Location}}TBD{{else}}{{.Event.Location}}{{end}}</strong></div></div>
-        </div>
-      </div>
+{{define "content"}}{{$p := .Page}}{{$m := $p.Menu}}{{$g := $p.Guests}}
+<section class="faq-head">
+  <div class="wrap head-row">
+    <div>
+      <span class="eyebrow-pill">{{icon "local-fire-department"}} Event FAQ &amp; guest guide</span>
+      <h1 class="display">The Feast Survival Guide</h1>
+      <p class="lead">Everything you need to know to show up hungry for {{.Event.Name}}: when and where, what to bring, and how oven time works.{{if or (tbd .Event.Date) (tbd .Event.Location)}} A few details are still cooking. We'll update this page as soon as they're set.{{end}}</p>
+    </div>
+    <div class="head-chips">
+      <div class="mini-stat">{{icon "calendar-month" "ink-pumpkin"}}<div><span class="label-sm muted">Date</span><strong>{{if tbd .Event.Date}}TBD{{else}}{{.Event.Date}}{{end}}</strong></div></div>
+      <div class="mini-stat">{{icon "location-on" "ink-cranberry"}}<div><span class="label-sm muted">Location</span><strong>{{if tbd .Event.Location}}TBD{{else}}{{.Event.Location}}{{end}}</strong></div></div>
     </div>
   </div>
 </section>
 
 <div class="wrap section-gap">
-  <div class="detail-grid">
-    <article class="card card-lg detail-card">
-      <span class="icon-bubble lg tone-pumpkin">{{icon "calendar-month"}}</span>
-      <p class="eyebrow">When</p>
-      <h2 class="big">{{if tbd .Event.Date}}TBD{{else}}{{.Event.Date}}{{end}}</h2>
-      <p class="title-md muted">{{if tbd .Event.Time}}Time to be announced{{else}}{{.Event.Time}}{{end}}</p>
-      {{- if or (tbd .Event.Date) (tbd .Event.Time)}}
-      <p class="note">{{icon "schedule"}}<span>We're still locking in the timing. Keep an eye on this page.</span></p>
-      {{- end}}
-    </article>
-    <article class="card card-lg detail-card">
-      <span class="icon-bubble lg tone-cranberry">{{icon "location-on"}}</span>
-      <p class="eyebrow">Where</p>
-      <h2 class="big">{{if tbd .Event.Location}}TBD{{else}}{{.Event.Location}}{{end}}</h2>
-      {{- with .Event.Address}}
-      <p class="title-md muted">{{.}}</p>
-      <a class="btn btn-white" href="{{mapsURL .}}" target="_blank" rel="noopener">{{icon "map" "ink-cranberry"}}Open in Maps</a>
-      {{- else}}
-      <p class="title-md muted">Venue to be announced</p>
-      <p class="note">{{icon "map"}}<span>The address will show up here once we've picked a spot.</span></p>
-      {{- end}}
-    </article>
+  <div class="grid-12">
+    <div class="span-8 faq-list">
+      <details class="faq" open>
+        <summary>
+          <span class="faq-icon tone-pumpkin">{{icon "schedule"}}</span>
+          <span class="grow"><span class="faq-cat ink-pumpkin">Arrival &amp; timing</span><span class="faq-q">When is the feast?</span></span>
+          {{icon "expand-more" "faq-chevron"}}
+        </summary>
+        <div class="faq-a">
+          {{- if tbd .Event.Date}}
+          <p>We're still locking in the date. Keep an eye on this page: it updates the moment the plan is set.</p>
+          {{- else}}
+          <p><strong>{{.Event.Date}}</strong>{{if tbd .Event.Time}}. The start time is still to be announced.{{else}}, starting at <strong>{{.Event.Time}}</strong>.{{end}}</p>
+          {{- end}}
+          <p class="faq-box">{{icon "info"}}<span>If anything changes, it changes here first, so check back before you head over.</span></p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>
+          <span class="faq-icon tone-cranberry">{{icon "location-on"}}</span>
+          <span class="grow"><span class="faq-cat ink-cranberry">Location &amp; travel</span><span class="faq-q">Where is it?</span></span>
+          {{icon "expand-more" "faq-chevron"}}
+        </summary>
+        <div class="faq-a">
+          {{- if tbd .Event.Location}}
+          <p>We haven't picked a spot yet. The address will show up here once we have.</p>
+          {{- else}}
+          <p><strong>{{.Event.Location}}</strong>{{with .Event.Address}}, {{.}}{{end}}</p>
+          {{- end}}
+          {{- with .Event.Address}}
+          <a class="btn btn-white" href="{{mapsURL .}}" target="_blank" rel="noopener">{{icon "map" "ink-cranberry"}}Open in Maps</a>
+          {{- end}}
+          <p class="faq-box">{{icon "forum"}}<span>Need a ride or have seats to spare? Sort out carpools in the <a class="link" href="/forum">forum</a>.</span></p>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>
+          <span class="faq-icon tone-sage">{{icon "group"}}</span>
+          <span class="grow"><span class="faq-cat ink-sage">RSVP &amp; plus-ones</span><span class="faq-q">Can I bring my partner or kids?</span></span>
+          {{icon "expand-more" "faq-chevron"}}
+        </summary>
+        <div class="faq-a">
+          <p>Yes! RSVP on the overview page and add everyone in your party, kids included, so we know how many seats to set. <strong>{{$g.Total}} {{plural $g.Total "person is" "people are"}} coming</strong> so far.</p>
+          <a class="btn btn-white" href="/#rsvp">{{icon "check-circle" "ink-sage"}}{{if $g.Mine}}Update your RSVP{{else}}RSVP &amp; add your party{{end}}</a>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>
+          <span class="faq-icon tone-amber">{{icon "restaurant"}}</span>
+          <span class="grow"><span class="faq-cat ink-amber">What to bring</span><span class="faq-q">What should I bring?</span></span>
+          {{icon "expand-more" "faq-chevron"}}
+        </summary>
+        <div class="faq-a">
+          <p>Claim a dish on the potluck board. Pick a course (appetizer, main, side, dessert, or beverage) so the menu stays balanced and we don't end up with five pies and no turkey.</p>
+          {{- if $m.Missing}}
+          <p class="faq-box warn">{{icon "warning"}}<span><strong>Still needed:</strong> {{courses $m.Missing}}.</span></p>
+          {{- end}}
+          <a class="btn btn-white" href="/potluck#bring">{{icon "add" "ink-pumpkin"}}Bring a dish</a>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>
+          <span class="faq-icon tone-pumpkin">{{icon "local-fire-department"}}</span>
+          <span class="grow"><span class="faq-cat ink-pumpkin">Kitchen &amp; oven</span><span class="faq-q">My dish needs the oven. What do I do?</span></span>
+          {{icon "expand-more" "faq-chevron"}}
+        </summary>
+        <div class="faq-a">
+          <p>Oven space is the bottleneck. When you add your dish, switch on <strong>Needs the oven</strong> and add the temperature and time so we can plan the bake schedule. {{len $m.Oven}} {{plural (len $m.Oven) "dish needs" "dishes need"}} the oven so far.</p>
+          <a class="btn btn-white" href="/potluck#oven">{{icon "local-fire-department" "ink-pumpkin"}}See the oven lineup</a>
+        </div>
+      </details>
+
+      <details class="faq">
+        <summary>
+          <span class="faq-icon tone-rose">{{icon "eco"}}</span>
+          <span class="grow"><span class="faq-cat ink-cranberry">Dietary needs</span><span class="faq-q">How will I know what fits my diet?</span></span>
+          {{icon "expand-more" "faq-chevron"}}
+        </summary>
+        <div class="faq-a">
+          <p>Cooks tag their dishes when they add them, so look for these on the potluck board:</p>
+          <div class="tags">{{range dietTags}}<span class="pill pill-lg {{if .Warn}}pill-warn{{else}}pill-sage{{end}}">{{.Emoji}} {{.Label}}</span>{{end}}</div>
+          <p class="faq-box">{{icon "help"}}<span>Have an allergy the tags don't cover? Ask in the forum so every cook sees it.</span></p>
+        </div>
+      </details>
+    </div>
+
+    <aside class="span-4 stack-lg">
+      <section class="card card-lg ask-card">
+        <div class="card-head">
+          <span class="icon-bubble tone-amber">{{icon "help"}}</span>
+          <div>
+            <h2 class="title-md">Got a question?</h2>
+            <p class="small ink-sage strong">Everyone sees the answer</p>
+          </div>
+        </div>
+        <p class="muted small">Allergies, what time to show up, whether to bring a folding chair: ask the whole table in the forum.</p>
+        <form class="stack" method="post" action="/forum">
+          <div class="field">
+            <label for="ask-title">Your question</label>
+            <input id="ask-title" name="title" maxlength="120" required autocomplete="off" placeholder="e.g. Is there room in the fridge?">
+          </div>
+          <div class="field">
+            <label for="ask-body">Details <span class="optional">optional</span></label>
+            <textarea id="ask-body" name="body" rows="3" maxlength="5000" placeholder="Anything that helps people answer"></textarea>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">{{icon "send"}}Ask in the forum</button>
+        </form>
+      </section>
+
+      <section class="card card-lg card-tint">
+        <span class="icon-bubble tone-pumpkin">{{icon "restaurant"}}</span>
+        <h2 class="h-sm">Course checklist</h2>
+        <p class="muted small">{{$m.Covered}} of {{len $m.Courses}} courses have someone on them.</p>
+        <ul class="check-list">
+          {{- range $m.Courses}}
+          <li>
+            <span class="dot tone-{{.Tone}}"></span>
+            <span class="grow">{{.Plural}}</span>
+            {{- if .Dishes}}
+            <span class="pill pill-sage">{{icon "check"}}{{len .Dishes}}</span>
+            {{- else}}
+            <a class="pill pill-pumpkin" href="/potluck?add={{.Key}}#bring">Needs someone</a>
+            {{- end}}
+          </li>
+          {{- end}}
+        </ul>
+      </section>
+    </aside>
   </div>
 
   <section class="card card-lg">
@@ -48,58 +154,34 @@
         <p class="eyebrow">Feast day prep</p>
         <h2 class="h-md">How {{.Event.Name}} works</h2>
       </div>
+      <span class="pill pill-plain">Four easy steps</span>
     </div>
     <ol class="steps">
       <li class="step">
-        <span class="step-num">1</span>
+        <span class="step-label">Step 1</span>
+        <h3 class="title-md">RSVP</h3>
+        <p class="muted">Say you're coming and add anyone you're bringing, kids included.</p>
+        <a class="link" href="/#rsvp">RSVP {{icon "arrow-forward"}}</a>
+      </li>
+      <li class="step">
+        <span class="step-label">Step 2</span>
         <h3 class="title-md">Claim a dish</h3>
-        <p class="muted">Pick a course (appetizer, main, side, dessert, or beverage) so the menu stays balanced.</p>
+        <p class="muted">Pick a course so the menu stays balanced.</p>
         <a class="link" href="/potluck#bring">Bring a dish {{icon "arrow-forward"}}</a>
       </li>
       <li class="step">
-        <span class="step-num">2</span>
+        <span class="step-label">Step 3</span>
         <h3 class="title-md">Flag the oven</h3>
-        <p class="muted">Oven space is the bottleneck. If yours needs to bake or reheat, say so and add the temp and time.</p>
+        <p class="muted">If yours needs to bake or reheat, say so and add the temp and time.</p>
         <a class="link" href="/potluck#oven">See the oven lineup {{icon "arrow-forward"}}</a>
       </li>
       <li class="step">
-        <span class="step-num">3</span>
+        <span class="step-label">Step 4</span>
         <h3 class="title-md">Talk it out</h3>
-        <p class="muted">Carpools, recipe debates, games, and questions for the host all go in the forum.</p>
+        <p class="muted">Carpools, recipe debates, games, and questions for the host go in the forum.</p>
         <a class="link" href="/forum">Open the forum {{icon "arrow-forward"}}</a>
       </li>
     </ol>
   </section>
-
-  <div class="grid-12">
-    <section class="card card-lg span-7">
-      <div class="card-title-row">
-        <h2 class="h-md">Course checklist</h2>
-        <span class="pill pill-sage">{{$m.Covered}} of {{len $m.Courses}} covered</span>
-      </div>
-      <ul class="course-list">
-        {{- range $m.Courses}}
-        <li class="course-row">
-          <span class="icon-bubble sm tone-{{.Tone}}">{{icon .Icon}}</span>
-          <div class="grow">
-            <h3>{{.Plural}}</h3>
-            <p>{{.Blurb}}</p>
-          </div>
-          {{- if .Dishes}}
-          <span class="pill pill-sage">{{icon "check"}}{{len .Dishes}}</span>
-          {{- else}}
-          <a class="pill pill-oven" href="/potluck?add={{.Key}}#bring">Needs someone</a>
-          {{- end}}
-        </li>
-        {{- end}}
-      </ul>
-    </section>
-    <section class="card card-lg span-5 card-tint">
-      <span class="icon-bubble lg tone-amber">{{icon "help"}}</span>
-      <h2 class="h-md">Got a question?</h2>
-      <p class="muted">Allergies, plus-ones, what time to show up, whether to bring a folding chair: ask in the forum so everyone sees the answer.</p>
-      <a class="btn btn-primary" href="/forum#new">{{icon "chat-bubble"}}Ask in the forum</a>
-    </section>
-  </div>
 </div>
 {{end}}

@@ -19,7 +19,7 @@
   <p class="dish-notes">{{.}}</p>
   {{- end}}
   {{- with $d.Tags}}
-  <div class="tags">{{range .}}{{with tag .}}<span class="pill{{if .Warn}} pill-warn{{end}}">{{.Label}}</span>{{end}}{{end}}</div>
+  <div class="tags">{{range .}}{{with tag .}}<span class="pill {{if .Warn}}pill-warn{{else}}pill-sage{{end}}">{{.Label}}</span>{{end}}{{end}}</div>
   {{- end}}
   <div class="dish-foot">
     <span class="who">{{template "avatar" $d.BroughtBy}}<span>{{$d.BroughtBy}}</span></span>

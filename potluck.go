@@ -40,14 +40,15 @@ func categoryByKey(key string) *category {
 type dietTag struct {
 	Key   string
 	Label string
+	Emoji string
 	Warn  bool // allergen, not a preference
 }
 
 var dietTags = []dietTag{
-	{"vegetarian", "Vegetarian", false},
-	{"vegan", "Vegan", false},
-	{"gluten-free", "Gluten-free", false},
-	{"nuts", "Contains nuts", true},
+	{"vegetarian", "Vegetarian", "🌿", false},
+	{"vegan", "Vegan", "🌱", false},
+	{"gluten-free", "Gluten-free", "🌾", false},
+	{"nuts", "Contains nuts", "🥜", true},
 }
 
 func tagByKey(key string) *dietTag {
@@ -66,12 +67,20 @@ type course struct {
 	Dishes []Dish
 }
 
+// tagCount is how many dishes carry one dietary tag.
+type tagCount struct {
+	dietTag
+	N int
+}
+
 type menu struct {
-	Courses []course
-	Total   int
-	Oven    []Dish
-	Cooks   int
-	Missing []category
+	Courses  []course
+	Total    int
+	Oven     []Dish
+	Cooks    int
+	Missing  []category
+	Tags     []tagCount
+	Friendly int // dishes tagged vegetarian, vegan, or gluten-free
 }
 
 func buildMenu(dishes []Dish) menu {
@@ -79,6 +88,9 @@ func buildMenu(dishes []Dish) menu {
 	cooks := map[string]bool{}
 	for i, c := range categories {
 		m.Courses = append(m.Courses, course{category: c, Num: i + 1})
+	}
+	for _, t := range dietTags {
+		m.Tags = append(m.Tags, tagCount{dietTag: t})
 	}
 	for _, d := range dishes {
 		for i := range m.Courses {
@@ -90,6 +102,16 @@ func buildMenu(dishes []Dish) menu {
 			m.Oven = append(m.Oven, d)
 		}
 		cooks[strings.ToLower(d.BroughtBy)] = true
+		friendly := false
+		for i := range m.Tags {
+			if slices.Contains(d.Tags, m.Tags[i].Key) {
+				m.Tags[i].N++
+				friendly = friendly || !m.Tags[i].Warn
+			}
+		}
+		if friendly {
+			m.Friendly++
+		}
 	}
 	for _, c := range m.Courses {
 		if len(c.Dishes) == 0 {
@@ -101,6 +123,16 @@ func buildMenu(dishes []Dish) menu {
 }
 
 func (m menu) Covered() int { return len(m.Courses) - len(m.Missing) }
+
+// Tagged reports whether any dish carries a dietary tag.
+func (m menu) Tagged() bool {
+	for _, t := range m.Tags {
+		if t.N > 0 {
+			return true
+		}
+	}
+	return false
+}
 
 // courseList renders categories as prose: "sides, desserts and beverages".
 func courseList(cs []category) string {

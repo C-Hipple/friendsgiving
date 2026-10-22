@@ -25,12 +25,12 @@
         <span class="brand-sub">The Great Thanksgiving Feast</span>
       </span>
     </a>
-    <div class="meta-chip">{{icon "calendar-month"}}<span>{{template "date" .Event}} • {{template "place" .Event}} • {{.Counts.Dishes}} {{plural .Counts.Dishes "dish" "dishes"}} pledged</span></div>
+    <div class="meta-chip">{{icon "calendar-month"}}<span>{{template "date" .Event}} • {{template "place" .Event}} • {{.Counts.Coming}} {{plural .Counts.Coming "friend" "friends"}} attending</span></div>
     <nav class="main-nav" aria-label="Main">
-      <a href="/"{{if eq .Nav "home"}} aria-current="page"{{end}}>Overview</a>
-      <a href="/potluck"{{if eq .Nav "potluck"}} aria-current="page"{{end}}>Potluck</a>
-      <a href="/details"{{if eq .Nav "details"}} aria-current="page"{{end}}><span class="hide-sm">Event </span>Details</a>
-      <a href="/forum"{{if eq .Nav "forum"}} aria-current="page"{{end}}>Forum</a>
+      <a href="/"{{if eq .Nav "home"}} aria-current="page"{{end}}>Overview<span class="nav-more"> &amp; RSVP</span></a>
+      <a href="/potluck"{{if eq .Nav "potluck"}} aria-current="page"{{end}}>Potluck<span class="nav-more"> Signup</span></a>
+      <a href="/details"{{if eq .Nav "details"}} aria-current="page"{{end}}><span class="hide-sm">Event </span>FAQ</a>
+      <a href="/forum"{{if eq .Nav "forum"}} aria-current="page"{{end}}><span class="nav-more">Feast </span>Forum</a>
     </nav>
     <div class="header-end">
       <a class="oven-chip" href="/potluck#oven">{{icon "local-fire-department"}}<span>Oven: {{.Counts.Oven}} {{plural .Counts.Oven "dish" "dishes"}}</span></a>
@@ -59,7 +59,7 @@
     <div>
       <h3>{{icon "calendar-month"}} When &amp; Where</h3>
       <p>{{template "date" .Event}}{{if not (tbd .Event.Time)}}, {{.Event.Time}}{{end}} · {{template "place" .Event}}</p>
-      <a href="/details">Event details →</a>
+      <a href="/details">Read the event FAQ →</a>
     </div>
     <div>
       <h3>{{icon "forum"}} The Forum</h3>

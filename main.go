@@ -143,6 +143,9 @@ func (a *app) routes() http.Handler {
 
 	mux.HandleFunc("GET /{$}", a.home)
 	mux.HandleFunc("GET /details", a.details)
+	mux.HandleFunc("POST /rsvp", a.setRSVP)
+	mux.HandleFunc("POST /rsvp/guests", a.addGuest)
+	mux.HandleFunc("POST /rsvp/guests/{id}/delete", a.deleteGuest)
 
 	mux.HandleFunc("GET /potluck", a.potluck)
 	mux.HandleFunc("POST /potluck", a.createDish)
