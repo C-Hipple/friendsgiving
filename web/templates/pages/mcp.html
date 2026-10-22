@@ -1,0 +1,81 @@
+{{define "content"}}{{$p := .Page}}
+<section class="page-head">
+  <div class="wrap narrow">
+    <div class="head-card">
+      <span class="eyebrow-pill">{{icon "celebration"}} MCP server</span>
+      <h1 class="display">Bring your Claude</h1>
+      <p class="lead">{{.Event.Name}} has an MCP server, so Claude can check the plan, sign you up for a dish, and keep up with the forum for you. It gets in with the site password and posts under whatever name you give it.</p>
+    </div>
+  </div>
+</section>
+
+<div class="wrap narrow section-gap" data-mcp-setup>
+  <section class="card card-lg stack-lg">
+    <div>
+      <p class="eyebrow">Step 1</p>
+      <h2 class="h-md">Make your link</h2>
+      <p class="muted">Claude connects with a link that holds a name and the site password. Fill them in and the links below update. Nothing you type here leaves this page.</p>
+    </div>
+    <div class="field">
+      <label for="mcp-name">Name to post as</label>
+      <input id="mcp-name" name="name" value="{{.User}}" maxlength="40" autocomplete="off">
+      <p class="small muted">Keep it as {{.User}} and you and Claude can edit each other's dishes and posts. Pick another, like “{{.User}}'s Claude”, to keep them apart.</p>
+    </div>
+    <div class="field">
+      <label for="mcp-password">Site password</label>
+      <input id="mcp-password" name="password" type="password" autocomplete="current-password" placeholder="The one you used to get in">
+    </div>
+  </section>
+
+  <section class="card card-lg stack-lg">
+    <div>
+      <p class="eyebrow">Step 2</p>
+      <h2 class="h-md">Give it to Claude</h2>
+    </div>
+    <div class="stack">
+      <h3 class="title-md">{{icon "chat-bubble" "ink-pumpkin"}} Claude on the web or desktop</h3>
+      <ol class="how">
+        <li><span>Open <strong>Settings → Connectors</strong> and choose <strong>Add custom connector</strong>.</span></li>
+        <li><span>Name it <strong>{{.Event.Name}}</strong> and paste this as the URL:</span></li>
+      </ol>
+      <pre class="code"><code>{{template "mcpLink" $p}}</code></pre>
+      <p class="small muted">Then ask something like “What's still missing from the {{.Event.Name}} menu?”</p>
+    </div>
+    <div class="stack">
+      <h3 class="title-md">{{icon "edit-note" "ink-pumpkin"}} Claude Code</h3>
+      <pre class="code"><code>claude mcp add --transport http brogiving '{{template "mcpLink" $p}}'</code></pre>
+    </div>
+    <div class="stack">
+      <h3 class="title-md">{{icon "key" "ink-pumpkin"}} Anything else</h3>
+      <p class="muted">Any MCP client that speaks Streamable HTTP can use <code>{{$p.URL}}</code>. If it can send headers, skip the link and use HTTP Basic auth instead: your name as the username and the site password as the password.</p>
+    </div>
+  </section>
+
+  <section class="card card-lg">
+    <div class="card-title-row">
+      <div>
+        <p class="eyebrow">Tools</p>
+        <h2 class="h-md">What Claude can do here</h2>
+      </div>
+      <span class="pill pill-sage">{{len $p.Tools}} tools</span>
+    </div>
+    <ul class="course-list">
+      {{- range $p.Tools}}
+      <li class="course-row">
+        <div class="grow">
+          <h3>{{.Title}} <code class="count">{{.Name}}</code></h3>
+          <p>{{.Description}}</p>
+        </div>
+        {{- if .Annotations.ReadOnly}}
+        <span class="pill pill-sage">Read-only</span>
+        {{- end}}
+      </li>
+      {{- end}}
+    </ul>
+  </section>
+
+  <p class="note">{{icon "lock"}}<span>Claude posts where everyone can see it, and can only change or delete things under its name. The link holds the password, so please don't share it except with your Claude.</span></p>
+</div>
+{{end}}
+
+{{define "mcpLink"}}{{.URL}}?name=<span data-slot="name">{{.Name}}</span>&amp;password=<span data-slot="password">PASSWORD</span>{{end}}

@@ -67,9 +67,15 @@ func setCookie(w http.ResponseWriter, r *http.Request, name, value string, maxAg
 		Path:     "/",
 		MaxAge:   int(maxAge.Seconds()),
 		HttpOnly: true,
-		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+		Secure:   overHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+// overHTTPS reports whether the visitor reached the site over HTTPS, directly
+// or through a TLS-terminating proxy.
+func overHTTPS(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
 func setFlash(w http.ResponseWriter, r *http.Request, msg string) {
@@ -98,7 +104,8 @@ func localPath(p string) string {
 func (a *app) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
-		if p == "/login" || p == "/healthz" || p == "/favicon.ico" || strings.HasPrefix(p, "/static/") {
+		// /mcp checks the password itself, since MCP clients don't keep cookies.
+		if p == "/login" || p == "/healthz" || p == "/favicon.ico" || p == "/mcp" || strings.HasPrefix(p, "/static/") {
 			next.ServeHTTP(w, r)
 			return
 		}

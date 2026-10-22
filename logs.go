@@ -17,10 +17,11 @@ import (
 const logsShown = 500
 
 // auditPosts records each POST once it's been handled, so the entry carries
-// the response status.
+// the response status. /mcp logs its own entries, since its name and content
+// aren't in a cookie and a form.
 func (a *app) auditPosts(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
+		if r.Method != http.MethodPost || r.URL.Path == "/mcp" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -32,15 +33,21 @@ func (a *app) auditPosts(next http.Handler) http.Handler {
 			}
 			form[k] = vs
 		}
-		entry := PostLog{Path: r.URL.Path, User: userName(r), IP: a.clientIP(r), Form: form}
+		entry := PostLog{Path: r.URL.Path, User: userName(r), Form: form}
 
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
 		entry.Status = rec.status
-		if err := a.store.LogPost(context.WithoutCancel(r.Context()), entry); err != nil {
-			log.Printf("error: post log: %v", err)
-		}
+		a.logPost(r, entry)
 	})
+}
+
+// logPost adds entry to the post log, as having come from r's sender.
+func (a *app) logPost(r *http.Request, entry PostLog) {
+	entry.IP = a.clientIP(r)
+	if err := a.store.LogPost(context.WithoutCancel(r.Context()), entry); err != nil {
+		log.Printf("error: post log: %v", err)
+	}
 }
 
 // clientIP is the address a request came from. Fly's proxy reports it in

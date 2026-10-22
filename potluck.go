@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -139,40 +140,52 @@ func (f dishForm) HasTag(key string) bool {
 
 func parseDish(r *http.Request) dishForm {
 	r.ParseForm()
-	f := dishForm{
-		Dish: Dish{
-			Name:      strings.Join(strings.Fields(r.PostForm.Get("name")), " "),
-			Category:  r.PostForm.Get("category"),
-			NeedsOven: r.PostForm.Get("needs_oven") != "",
-			OvenNotes: strings.TrimSpace(r.PostForm.Get("oven_notes")),
-			Notes:     strings.TrimSpace(r.PostForm.Get("notes")),
-		},
-		Errors: map[string]string{},
+	d := Dish{
+		Name:      r.PostForm.Get("name"),
+		Category:  r.PostForm.Get("category"),
+		NeedsOven: r.PostForm.Get("needs_oven") != "",
+		OvenNotes: r.PostForm.Get("oven_notes"),
+		Notes:     r.PostForm.Get("notes"),
+		Tags:      r.PostForm["tags"],
 	}
-	for _, k := range r.PostForm["tags"] {
-		if tagByKey(k) != nil && !f.HasTag(k) {
-			f.Dish.Tags = append(f.Dish.Tags, k)
+	errs := checkDish(&d)
+	return dishForm{Dish: d, Errors: errs}
+}
+
+// checkDish tidies a dish from the web form or an MCP tool, and says what's
+// wrong with it by form field.
+func checkDish(d *Dish) map[string]string {
+	d.Name = strings.Join(strings.Fields(d.Name), " ")
+	d.OvenNotes = strings.TrimSpace(d.OvenNotes)
+	d.Notes = strings.TrimSpace(d.Notes)
+	if !d.NeedsOven {
+		d.OvenNotes = ""
+	}
+	var tags []string
+	for _, k := range d.Tags {
+		if tagByKey(k) != nil && !slices.Contains(tags, k) {
+			tags = append(tags, k)
 		}
 	}
-	if !f.Dish.NeedsOven {
-		f.Dish.OvenNotes = ""
-	}
-	switch n := utf8.RuneCountInString(f.Dish.Name); {
+	d.Tags = tags
+
+	errs := map[string]string{}
+	switch n := utf8.RuneCountInString(d.Name); {
 	case n == 0:
-		f.Errors["name"] = "What are you bringing?"
+		errs["name"] = "What are you bringing?"
 	case n > 80:
-		f.Errors["name"] = "Keep the dish name under 80 characters."
+		errs["name"] = "Keep the dish name under 80 characters."
 	}
-	if categoryByKey(f.Dish.Category) == nil {
-		f.Errors["category"] = "Pick a course."
+	if categoryByKey(d.Category) == nil {
+		errs["category"] = "Pick a course."
 	}
-	if utf8.RuneCountInString(f.Dish.OvenNotes) > 80 {
-		f.Errors["oven_notes"] = "Keep oven details under 80 characters."
+	if utf8.RuneCountInString(d.OvenNotes) > 80 {
+		errs["oven_notes"] = "Keep oven details under 80 characters."
 	}
-	if utf8.RuneCountInString(f.Dish.Notes) > 280 {
-		f.Errors["notes"] = "Keep notes under 280 characters."
+	if utf8.RuneCountInString(d.Notes) > 280 {
+		errs["notes"] = "Keep notes under 280 characters."
 	}
-	return f
+	return errs
 }
 
 type tab struct {

@@ -79,34 +79,35 @@ func openStore(path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// The JSON names are what MCP tools take and return.
 type Dish struct {
-	ID        int64
-	Name      string
-	Category  string
-	NeedsOven bool
-	OvenNotes string
-	Notes     string
-	Tags      []string
-	BroughtBy string
-	CreatedAt time.Time
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Category  string    `json:"course"`
+	NeedsOven bool      `json:"needs_oven"`
+	OvenNotes string    `json:"oven_notes,omitempty"`
+	Notes     string    `json:"notes,omitempty"`
+	Tags      []string  `json:"dietary_tags,omitempty"`
+	BroughtBy string    `json:"brought_by"`
+	CreatedAt time.Time `json:"added_at"`
 }
 
 type Thread struct {
-	ID           int64
-	Title        string
-	Body         string
-	Author       string
-	CreatedAt    time.Time
-	LastActivity time.Time
-	ReplyCount   int
+	ID           int64     `json:"id"`
+	Title        string    `json:"title"`
+	Body         string    `json:"body"`
+	Author       string    `json:"author"`
+	CreatedAt    time.Time `json:"created_at"`
+	LastActivity time.Time `json:"last_activity_at"`
+	ReplyCount   int       `json:"reply_count"`
 }
 
 type Reply struct {
-	ID        int64
-	ThreadID  int64
-	Body      string
-	Author    string
-	CreatedAt time.Time
+	ID        int64     `json:"id"`
+	ThreadID  int64     `json:"thread_id"`
+	Body      string    `json:"body"`
+	Author    string    `json:"author"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 const dishCols = `id, name, category, needs_oven, oven_notes, notes, tags, brought_by, created_at`
@@ -262,23 +263,28 @@ func (s *Store) GetReply(ctx context.Context, id int64) (Reply, error) {
 	return r, err
 }
 
-func (s *Store) CreateReply(ctx context.Context, r Reply) error {
+func (s *Store) CreateReply(ctx context.Context, r Reply) (int64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer tx.Rollback()
 	now := time.Now().Unix()
-	if _, err := tx.ExecContext(ctx,
+	res, err := tx.ExecContext(ctx,
 		`INSERT INTO replies (thread_id, body, author, created_at) VALUES (?, ?, ?, ?)`,
-		r.ThreadID, r.Body, r.Author, now); err != nil {
-		return err
+		r.ThreadID, r.Body, r.Author, now)
+	if err != nil {
+		return 0, err
 	}
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE threads SET reply_count = reply_count + 1, last_activity_at = ? WHERE id = ?`, now, r.ThreadID); err != nil {
-		return err
+		return 0, err
 	}
-	return tx.Commit()
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return id, tx.Commit()
 }
 
 func (s *Store) DeleteReply(ctx context.Context, r Reply) error {
@@ -299,9 +305,9 @@ func (s *Store) DeleteReply(ctx context.Context, r Reply) error {
 
 // Person is anyone who has signed up for a dish or posted in the forum.
 type Person struct {
-	Name   string
-	Dishes int
-	Posts  int
+	Name   string `json:"name"`
+	Dishes int    `json:"dishes"`
+	Posts  int    `json:"posts"`
 }
 
 func (s *Store) People(ctx context.Context) ([]Person, error) {

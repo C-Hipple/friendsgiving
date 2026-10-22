@@ -30,11 +30,11 @@ type config struct {
 }
 
 type eventInfo struct {
-	Name     string
-	Date     string
-	Time     string
-	Location string
-	Address  string
+	Name     string `json:"name"`
+	Date     string `json:"date"`
+	Time     string `json:"time"`
+	Location string `json:"location"`
+	Address  string `json:"address,omitempty"`
 }
 
 func env(key, fallback string) string {
@@ -158,6 +158,11 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("POST /forum/{id}/replies/{rid}/delete", a.deleteReply)
 
 	mux.HandleFunc("GET /logs", a.logs) // unlisted
+
+	// Any method: /mcp skips the cookie gate, so a stray DELETE mustn't fall
+	// through to the not-found page and its event details.
+	mux.HandleFunc("/mcp", a.mcp)
+	mux.HandleFunc("GET /mcp/docs", a.mcpDocs)
 
 	mux.HandleFunc("/", a.notFound)
 
