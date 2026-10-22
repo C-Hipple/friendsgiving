@@ -37,6 +37,18 @@ docker compose cp brogiving:/data/brogiving.db ./backup.db
 
 To change event details later, edit `.env` and run `docker compose up -d`.
 
+## Post log
+
+Names are self-declared, so the site keeps a paper trail. Every POST is
+recorded with its endpoint, response status, the name the sender was using,
+their IP address, and the fields they sent, with passwords replaced by
+`[redacted]`. Anyone signed in can read it at `/logs`, which nothing links to,
+and filter it by name, endpoint, IP address, or content.
+
+The IP address comes from `Fly-Client-IP` on Fly.io, from the last
+`X-Forwarded-For` hop when a reverse proxy on a private or loopback address
+sends one, and from the connection otherwise.
+
 ## Configuration
 
 | Variable         | Default              | Notes                                         |
