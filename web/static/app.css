@@ -336,6 +336,7 @@ a.strong:hover, .link:hover { text-decoration: underline; text-underline-offset:
 .pill-pumpkin { background: var(--primary-fixed); color: var(--on-primary-fixed); }
 .pill-pumpkin .icon { color: var(--primary); }
 .pill-plain { background: var(--surface-high); color: var(--on-surface); }
+.pill-new { background: var(--primary); color: #fff; }
 .pill-lg { padding: .3125rem .75rem; font-size: .75rem; line-height: 1rem; }
 a.pill:hover { filter: brightness(.96); }
 
@@ -676,6 +677,7 @@ textarea:focus { outline: none; border-color: var(--primary-container); box-shad
 .dish-card:hover { box-shadow: var(--shadow-md); }
 .dish-card:target { outline: 2px solid var(--primary-container); outline-offset: 3px; }
 .dish-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.dish-top .pill-oven { flex-shrink: 1; } /* wraps, leaving room for the comments pill */
 .dish-name { font: 600 1.25rem/1.35 var(--font-display); overflow-wrap: anywhere; }
 .dish-notes { font-size: .875rem; line-height: 1.55; color: var(--on-surface-variant); overflow-wrap: anywhere; }
 .tags { display: flex; flex-wrap: wrap; gap: .375rem; }

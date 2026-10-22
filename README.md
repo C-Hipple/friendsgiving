@@ -6,6 +6,9 @@ A small, private coordination site for Thanksgiving: a potluck sign-up board
 - **Potluck**: claim a dish, pick a course (appetizer, main, side, dessert,
   beverage), flag whether it needs the oven (plus temp and time), and add
   notes and dietary tags. The oven lineup lists everything that needs oven time.
+  Each dish has its own page with one running comment thread, so friends can
+  ask about it and whoever's bringing it can answer; their comment pill lights
+  up when someone else has the last word.
 - **RSVPs**: on the overview, say you're in (or can't make it) and add the
   people you're bringing, marking kids. "Who's joining the table?" lists
   everyone coming, what they're bringing, and an adult/kid headcount.
@@ -90,7 +93,8 @@ claude mcp add --transport http brogiving 'https://your-site/mcp?name=Chris&pass
 
 The name is who Claude posts as, with the same ownership rules as the site.
 Tools cover the event details, RSVPs (the guest list, answering, adding and
-removing guests), the potluck (list, add, update, remove dishes), the forum
+removing guests), the potluck (list, add, update, remove dishes, and read, add, and delete
+comments on them), the forum
 (list, read, start, reply, delete), and who's involved. RSVPs count whoever
 holds the name, so an RSVP under a name like "Chris's Claude" counts one more
 person coming.

@@ -315,9 +315,9 @@ func (a *app) createDish(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/potluck#dish-"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
-// ownDish loads the dish named in the URL and checks it belongs to the
-// current user, writing an error response and returning false if not.
-func (a *app) ownDish(w http.ResponseWriter, r *http.Request) (Dish, bool) {
+// loadDish fetches the dish named in the URL, writing a 404 or 500 and
+// returning false when it can't.
+func (a *app) loadDish(w http.ResponseWriter, r *http.Request) (Dish, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		a.notFound(w, r)
@@ -330,6 +330,16 @@ func (a *app) ownDish(w http.ResponseWriter, r *http.Request) (Dish, bool) {
 	}
 	if err != nil {
 		a.serverError(w, r, err)
+		return d, false
+	}
+	return d, true
+}
+
+// ownDish loads the dish named in the URL and checks it belongs to the
+// current user, writing an error response and returning false if not.
+func (a *app) ownDish(w http.ResponseWriter, r *http.Request) (Dish, bool) {
+	d, ok := a.loadDish(w, r)
+	if !ok {
 		return d, false
 	}
 	if !sameName(d.BroughtBy, userName(r)) {
@@ -386,4 +396,82 @@ func (a *app) deleteDish(w http.ResponseWriter, r *http.Request) {
 	}
 	setFlash(w, r, d.Name+" is off the menu.")
 	http.Redirect(w, r, "/potluck", http.StatusSeeOther)
+}
+
+type dishPage struct {
+	Dish       Dish
+	Comments   []Comment
+	Comment    string
+	CommentErr string
+}
+
+func dishURL(id int64) string { return "/potluck/" + strconv.FormatInt(id, 10) }
+
+// dish shows one dish and its comments: a single conversation where anyone
+// can ask about it and whoever's bringing it can answer.
+func (a *app) dish(w http.ResponseWriter, r *http.Request) {
+	d, ok := a.loadDish(w, r)
+	if !ok {
+		return
+	}
+	a.renderDish(w, r, http.StatusOK, dishPage{Dish: d})
+}
+
+func (a *app) renderDish(w http.ResponseWriter, r *http.Request, status int, p dishPage) {
+	comments, err := a.store.ListComments(r.Context(), p.Dish.ID)
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	p.Comments = comments
+	a.render(w, r, status, "dish", view{Title: p.Dish.Name, Nav: "potluck", Page: p})
+}
+
+func (a *app) createComment(w http.ResponseWriter, r *http.Request) {
+	d, ok := a.loadDish(w, r)
+	if !ok {
+		return
+	}
+	body := postBody(r.FormValue("body"))
+	if msg := replyError(body); msg != "" {
+		a.renderDish(w, r, http.StatusUnprocessableEntity, dishPage{Dish: d, Comment: body, CommentErr: msg})
+		return
+	}
+	if _, err := a.store.CreateComment(r.Context(), Comment{DishID: d.ID, Body: body, Author: userName(r)}); err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	http.Redirect(w, r, dishURL(d.ID)+"#latest", http.StatusSeeOther)
+}
+
+func (a *app) deleteComment(w http.ResponseWriter, r *http.Request) {
+	d, ok := a.loadDish(w, r)
+	if !ok {
+		return
+	}
+	cid, err := strconv.ParseInt(r.PathValue("cid"), 10, 64)
+	if err != nil {
+		a.notFound(w, r)
+		return
+	}
+	c, err := a.store.GetComment(r.Context(), cid)
+	if err != nil && !errors.Is(err, errNotFound) {
+		a.serverError(w, r, err)
+		return
+	}
+	if err != nil || c.DishID != d.ID {
+		a.notFound(w, r)
+		return
+	}
+	if !sameName(c.Author, userName(r)) {
+		setFlash(w, r, "Only "+c.Author+" can delete that comment.")
+		http.Redirect(w, r, dishURL(d.ID), http.StatusSeeOther)
+		return
+	}
+	if err := a.store.DeleteComment(r.Context(), c.ID); err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	setFlash(w, r, "Comment deleted.")
+	http.Redirect(w, r, dishURL(d.ID)+"#comments", http.StatusSeeOther)
 }

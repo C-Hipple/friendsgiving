@@ -29,6 +29,15 @@ CREATE TABLE IF NOT EXISTS dishes (
 	updated_at  INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS dish_comments (
+	id         INTEGER PRIMARY KEY,
+	dish_id    INTEGER NOT NULL REFERENCES dishes (id) ON DELETE CASCADE,
+	body       TEXT    NOT NULL,
+	author     TEXT    NOT NULL,
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dish_comments_by_dish ON dish_comments (dish_id, created_at);
+
 CREATE TABLE IF NOT EXISTS threads (
 	id               INTEGER PRIMARY KEY,
 	title            TEXT    NOT NULL,
@@ -107,6 +116,25 @@ type Dish struct {
 	Tags      []string  `json:"dietary_tags,omitempty"`
 	BroughtBy string    `json:"brought_by"`
 	CreatedAt time.Time `json:"added_at"`
+
+	Comments      int    `json:"comments"`
+	LastCommentBy string `json:"last_comment_by,omitempty"`
+}
+
+// AwaitingReply reports whether someone else has the last word in the
+// dish's comments, so the person bringing it may want to answer.
+func (d Dish) AwaitingReply() bool {
+	return d.LastCommentBy != "" && !sameName(d.LastCommentBy, d.BroughtBy)
+}
+
+// Comment is one message in a dish's discussion. Each dish has a single
+// running conversation, oldest first, with no nesting.
+type Comment struct {
+	ID        int64     `json:"id"`
+	DishID    int64     `json:"dish_id"`
+	Body      string    `json:"body"`
+	Author    string    `json:"author"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type Thread struct {
@@ -127,13 +155,15 @@ type Reply struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-const dishCols = `id, name, category, needs_oven, oven_notes, notes, tags, brought_by, created_at`
+const dishCols = `id, name, category, needs_oven, oven_notes, notes, tags, brought_by, created_at,
+	(SELECT COUNT(*) FROM dish_comments WHERE dish_id = dishes.id),
+	COALESCE((SELECT author FROM dish_comments WHERE dish_id = dishes.id ORDER BY created_at DESC, id DESC LIMIT 1), '')`
 
 func scanDish(row interface{ Scan(...any) error }) (Dish, error) {
 	var d Dish
 	var tags string
 	var created int64
-	err := row.Scan(&d.ID, &d.Name, &d.Category, &d.NeedsOven, &d.OvenNotes, &d.Notes, &tags, &d.BroughtBy, &created)
+	err := row.Scan(&d.ID, &d.Name, &d.Category, &d.NeedsOven, &d.OvenNotes, &d.Notes, &tags, &d.BroughtBy, &created, &d.Comments, &d.LastCommentBy)
 	if tags != "" {
 		d.Tags = strings.Split(tags, ",")
 	}
@@ -188,6 +218,57 @@ func (s *Store) UpdateDish(ctx context.Context, d Dish) error {
 
 func (s *Store) DeleteDish(ctx context.Context, id int64) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM dishes WHERE id = ?`, id)
+	return err
+}
+
+const commentCols = `id, dish_id, body, author, created_at`
+
+func scanComment(row interface{ Scan(...any) error }) (Comment, error) {
+	var c Comment
+	var created int64
+	err := row.Scan(&c.ID, &c.DishID, &c.Body, &c.Author, &created)
+	c.CreatedAt = time.Unix(created, 0)
+	return c, err
+}
+
+func (s *Store) ListComments(ctx context.Context, dishID int64) ([]Comment, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+commentCols+` FROM dish_comments WHERE dish_id = ? ORDER BY created_at, id`, dishID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Comment
+	for rows.Next() {
+		c, err := scanComment(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) GetComment(ctx context.Context, id int64) (Comment, error) {
+	c, err := scanComment(s.db.QueryRowContext(ctx, `SELECT `+commentCols+` FROM dish_comments WHERE id = ?`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return c, errNotFound
+	}
+	return c, err
+}
+
+func (s *Store) CreateComment(ctx context.Context, c Comment) (int64, error) {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO dish_comments (dish_id, body, author, created_at) VALUES (?, ?, ?, ?)`,
+		c.DishID, c.Body, c.Author, time.Now().Unix())
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+func (s *Store) DeleteComment(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM dish_comments WHERE id = ?`, id)
 	return err
 }
 

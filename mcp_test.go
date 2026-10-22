@@ -233,6 +233,57 @@ func TestMCPTools(t *testing.T) {
 	}
 }
 
+func TestMCPDishComments(t *testing.T) {
+	srv, store := newTestServer(t)
+	ctx := context.Background()
+	chris := mcpClient{t: t, url: srv.URL + "/mcp", name: "Chris", pass: "gobble"}
+	mike := mcpClient{t: t, url: srv.URL + "/mcp", name: "Mike", pass: "gobble"}
+
+	chris.call("add_dish", map[string]any{"name": "Pecan pie", "course": "dessert"})
+	if text, isErr := mike.call("comment_on_dish", map[string]any{"dish_id": 9, "body": "Hi"}); !isErr || !strings.Contains(text, "no dish 9") {
+		t.Errorf("comment on a missing dish: %v %s", isErr, text)
+	}
+	if text, isErr := mike.call("comment_on_dish", map[string]any{"dish_id": 1, "body": " "}); !isErr || !strings.Contains(text, "Write something first.") {
+		t.Errorf("blank comment: %v %s", isErr, text)
+	}
+	if text, isErr := mike.call("comment_on_dish", map[string]any{"dish_id": 1, "body": "Nut-free?"}); isErr || !strings.Contains(text, `"author": "Mike"`) {
+		t.Fatalf("comment_on_dish: %v %s", isErr, text)
+	}
+
+	// Chris's Claude hears about the question, and Mike's doesn't.
+	if text, _ := chris.call("get_event", nil); !strings.Contains(text, `"last_comment_by": "Mike"`) {
+		t.Errorf("get_event for Chris: %s", text)
+	}
+	if text, _ := mike.call("get_event", nil); !strings.Contains(text, `"your_dishes_awaiting_reply": []`) {
+		t.Errorf("get_event for Mike: %s", text)
+	}
+	if text, _ := mike.call("list_dishes", nil); !strings.Contains(text, `"comments": 1`) {
+		t.Errorf("list_dishes: %s", text)
+	}
+
+	chris.call("comment_on_dish", map[string]any{"dish_id": 1, "body": "Nope, it's pecan."})
+	if text, _ := chris.call("get_event", nil); !strings.Contains(text, `"your_dishes_awaiting_reply": []`) {
+		t.Errorf("get_event after Chris answers: %s", text)
+	}
+	var thread struct {
+		Dish     Dish      `json:"dish"`
+		Comments []Comment `json:"comments"`
+	}
+	text, _ := mike.call("read_dish", map[string]any{"id": 1})
+	if err := json.Unmarshal([]byte(text), &thread); err != nil || thread.Dish.Name != "Pecan pie" || len(thread.Comments) != 2 ||
+		thread.Comments[0].Author != "Mike" || thread.Comments[1].Author != "Chris" {
+		t.Fatalf("read_dish: %s", text)
+	}
+
+	if text, isErr := chris.call("delete_dish_comment", map[string]any{"id": 1}); !isErr || !strings.Contains(text, "Only Mike") {
+		t.Errorf("Chris deleted Mike's comment: %v %s", isErr, text)
+	}
+	mike.call("delete_dish_comment", map[string]any{"id": 1})
+	if _, err := store.GetComment(ctx, 1); err != errNotFound {
+		t.Errorf("after delete_dish_comment: err = %v", err)
+	}
+}
+
 func TestMCPRSVP(t *testing.T) {
 	srv, store := newTestServer(t)
 	ctx := context.Background()

@@ -4,7 +4,7 @@
 
 {{define "place"}}{{if tbd .Location}}Location TBD{{else}}{{.Location}}{{end}}{{end}}
 
-{{/* dishCard expects (dict "D" Dish "User" currentUserName) */}}
+{{/* dishCard expects (dict "D" Dish "User" currentUserName), plus "Here" true on the dish's own page */}}
 {{define "dishCard"}}{{$d := .D}}
 <article class="dish-card" id="dish-{{$d.ID}}">
   <div class="dish-top">
@@ -13,6 +13,7 @@
     {{- else}}
     <span class="pill pill-cool">{{icon "check"}}<span>No oven needed</span></span>
     {{- end}}
+    {{template "commentsPill" .}}
   </div>
   <h3 class="dish-name">{{$d.Name}}</h3>
   {{- with $d.Notes}}
@@ -36,6 +37,12 @@
   </div>
 </article>
 {{end}}
+
+{{/* commentsPill links to a dish's comments, and lights up for whoever's
+   bringing it when someone else has the last word. It takes dishCard's dict. */}}
+{{define "commentsPill"}}{{$d := .D}}{{$new := and (same $d.BroughtBy .User) $d.AwaitingReply}}
+<a class="pill {{if $new}}pill-new{{else}}pill-plain{{end}}" href="{{if not .Here}}/potluck/{{$d.ID}}{{end}}#comments"{{if $new}} title="New comment from {{$d.LastCommentBy}}"{{end}}>{{icon "chat-bubble"}}{{if $d.Comments}}{{$d.Comments}} {{plural $d.Comments "comment" "comments"}}{{else}}Comment{{end}}</a>
+{{- end}}
 
 {{/* dishForm expects (dict "Form" dishForm "Action" url "Submit" label "Icon" icon "Cancel" url-or-empty) */}}
 {{define "dishForm"}}{{$f := .Form}}

@@ -167,7 +167,7 @@ func (a *app) mcpInstructions(user string) string {
 
 You're signed in as %[2]s. Your RSVP and guests, the dishes you add, and the posts you write appear under that name for everyone to see, and you can only change or delete things under it. Write in your user's voice, and check with them before you post, RSVP, or sign them up for anything.
 
-Start with get_event for the plan, the headcount, and which courses still need someone. RSVPing puts %[2]s on the guest list, so only do it if that's your user's own name and not one for you. Check list_dishes before adding a dish so nobody doubles up, and set needs_oven for anything that has to bake or reheat at the party: oven space is the bottleneck.`,
+Start with get_event for the plan, the headcount, and which courses still need someone. RSVPing puts %[2]s on the guest list, so only do it if that's your user's own name and not one for you. Check list_dishes before adding a dish so nobody doubles up, and set needs_oven for anything that has to bake or reheat at the party: oven space is the bottleneck. Each dish has a comment thread for questions about it; when get_event says comments on your dishes are waiting on your reply, read_dish shows what was asked.`,
 		a.cfg.Event.Name, user)
 }
 
@@ -251,7 +251,7 @@ var (
 var mcpTools = []mcpTool{
 	{
 		Name: "get_event", Title: "Event details", Annotations: reads, run: (*app).toolGetEvent,
-		Description: "The plan: date, time and place, plus the headcount and whether you've RSVPed, how the potluck is shaping up (dishes per course, how many need the oven) and how busy the forum is. Start here.",
+		Description: "The plan: date, time and place, plus the headcount and whether you've RSVPed, how the potluck is shaping up (dishes per course, how many need the oven, and which of your dishes have comments waiting on your reply) and how busy the forum is. Start here.",
 		InputSchema: object(nil, map[string]any{}),
 	},
 	{
@@ -281,7 +281,7 @@ var mcpTools = []mcpTool{
 	},
 	{
 		Name: "list_dishes", Title: "List potluck dishes", Annotations: reads, run: (*app).toolListDishes,
-		Description: "Everything people have signed up to bring, oldest first. Optionally narrow it to one course, one person, or what needs the oven.",
+		Description: "Everything people have signed up to bring, oldest first, with how many comments each has and who wrote the latest. Optionally narrow it to one course, one person, or what needs the oven.",
 		InputSchema: object(nil, map[string]any{
 			"course":     oneOf("Only this course.", courseKeys()),
 			"brought_by": prop("string", "Only dishes this person is bringing."),
@@ -302,6 +302,24 @@ var mcpTools = []mcpTool{
 		Name: "remove_dish", Title: "Remove a dish", Annotations: changes, run: (*app).toolRemoveDish,
 		Description: "Take one of your dishes off the menu.",
 		InputSchema: object([]string{"id"}, withID("The dish's id, from list_dishes.", map[string]any{})),
+	},
+	{
+		Name: "read_dish", Title: "Read a dish's comments", Annotations: reads, run: (*app).toolReadDish,
+		Description: "A dish and its comments, oldest first. Each dish has one running conversation where anyone can ask about it and whoever's bringing it answers.",
+		InputSchema: object([]string{"id"}, withID("The dish's id, from list_dishes.", map[string]any{})),
+	},
+	{
+		Name: "comment_on_dish", Title: "Comment on a dish", Annotations: adds, run: (*app).toolCommentOnDish,
+		Description: "Add a comment to a dish's conversation under your name: ask whoever's bringing it a question (what's in it, how many it serves), or answer one about a dish you're bringing. Comments aren't threaded, so read_dish first and write as the next message in the conversation.",
+		InputSchema: object([]string{"dish_id", "body"}, map[string]any{
+			"dish_id": prop("integer", "The dish's id, from list_dishes."),
+			"body":    prop("string", "Plain text, up to 5,000 characters. Line breaks are kept."),
+		}),
+	},
+	{
+		Name: "delete_dish_comment", Title: "Delete a dish comment", Annotations: changes, run: (*app).toolDeleteDishComment,
+		Description: "Delete one of your comments on a dish.",
+		InputSchema: object([]string{"id"}, withID("The comment's id, from read_dish.", map[string]any{})),
 	},
 	{
 		Name: "list_threads", Title: "List forum threads", Annotations: reads, run: (*app).toolListThreads,
@@ -467,6 +485,18 @@ func (a *app) toolGetEvent(ctx context.Context, user string, _ json.RawMessage) 
 	for _, c := range m.Courses {
 		courses = append(courses, courseStatus{c.Key, c.Title, len(c.Dishes)})
 	}
+	type waiting struct {
+		ID            int64  `json:"dish_id"`
+		Name          string `json:"dish"`
+		Comments      int    `json:"comments"`
+		LastCommentBy string `json:"last_comment_by"`
+	}
+	awaiting := []waiting{}
+	for _, d := range dishesBy(dishes, user) {
+		if d.AwaitingReply() {
+			awaiting = append(awaiting, waiting{d.ID, d.Name, d.Comments, d.LastCommentBy})
+		}
+	}
 	return map[string]any{
 		"signed_in_as": user,
 		"event":        a.cfg.Event,
@@ -480,6 +510,8 @@ func (a *app) toolGetEvent(ctx context.Context, user string, _ json.RawMessage) 
 			"cooks":      m.Cooks,
 			"needs_oven": len(m.Oven),
 			"courses":    courses,
+
+			"your_dishes_awaiting_reply": awaiting,
 		},
 		"forum": map[string]any{"threads": c.Threads, "replies": c.Replies},
 	}, nil
@@ -629,10 +661,7 @@ func (a *app) myDish(ctx context.Context, user string, args json.RawMessage) (Di
 	if err != nil {
 		return Dish{}, err
 	}
-	d, err := a.store.GetDish(ctx, id)
-	if errors.Is(err, errNotFound) {
-		return d, toolErr(fmt.Sprintf("There's no dish %d. list_dishes shows the ones there are.", id))
-	}
+	d, err := a.findDish(ctx, id)
 	if err != nil {
 		return d, err
 	}
@@ -671,6 +700,74 @@ func (a *app) toolRemoveDish(ctx context.Context, user string, args json.RawMess
 		return nil, err
 	}
 	return map[string]any{"removed": d}, nil
+}
+
+func (a *app) findDish(ctx context.Context, id int64) (Dish, error) {
+	d, err := a.store.GetDish(ctx, id)
+	if errors.Is(err, errNotFound) {
+		return d, toolErr(fmt.Sprintf("There's no dish %d. list_dishes shows the ones there are.", id))
+	}
+	return d, err
+}
+
+func (a *app) toolReadDish(ctx context.Context, _ string, args json.RawMessage) (any, error) {
+	id, err := argID(args)
+	if err != nil {
+		return nil, err
+	}
+	d, err := a.findDish(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	comments, err := a.store.ListComments(ctx, d.ID)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"dish": d, "comments": orEmpty(comments)}, nil
+}
+
+func (a *app) toolCommentOnDish(ctx context.Context, user string, args json.RawMessage) (any, error) {
+	var in struct {
+		DishID int64  `json:"dish_id"`
+		Body   string `json:"body"`
+	}
+	if err := decodeArgs(args, &in); err != nil {
+		return nil, err
+	}
+	d, err := a.findDish(ctx, in.DishID)
+	if err != nil {
+		return nil, err
+	}
+	body := postBody(in.Body)
+	if msg := replyError(body); msg != "" {
+		return nil, toolErr(msg)
+	}
+	id, err := a.store.CreateComment(ctx, Comment{DishID: d.ID, Body: body, Author: user})
+	if err != nil {
+		return nil, err
+	}
+	return a.store.GetComment(ctx, id)
+}
+
+func (a *app) toolDeleteDishComment(ctx context.Context, user string, args json.RawMessage) (any, error) {
+	id, err := argID(args)
+	if err != nil {
+		return nil, err
+	}
+	c, err := a.store.GetComment(ctx, id)
+	if errors.Is(err, errNotFound) {
+		return nil, toolErr(fmt.Sprintf("There's no comment %d. read_dish shows a dish's comments.", id))
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !sameName(c.Author, user) {
+		return nil, toolErr("Only " + c.Author + " can delete that comment.")
+	}
+	if err := a.store.DeleteComment(ctx, c.ID); err != nil {
+		return nil, err
+	}
+	return map[string]any{"deleted": c}, nil
 }
 
 func (a *app) toolListThreads(ctx context.Context, _ string, _ json.RawMessage) (any, error) {

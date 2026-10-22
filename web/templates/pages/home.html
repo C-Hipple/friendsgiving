@@ -222,6 +222,9 @@
               <a class="strong" href="/potluck#dish-{{.ID}}">{{.Name}}</a>
               <p class="muted small">{{$c.Label}}{{if .NeedsOven}} · needs the oven{{with .OvenNotes}} ({{.}}){{end}}{{end}}</p>
             </div>
+            {{- if .Comments}}
+            <a class="pill {{if .AwaitingReply}}pill-new{{else}}pill-plain{{end}}" href="/potluck/{{.ID}}#comments"{{if .AwaitingReply}} title="New comment from {{.LastCommentBy}}"{{end}} aria-label="{{.Comments}} {{plural .Comments "comment" "comments"}} on {{.Name}}">{{icon "chat-bubble"}}{{.Comments}}</a>
+            {{- end}}
             <a class="icon-btn" href="/potluck/{{.ID}}/edit" aria-label="Edit {{.Name}}" title="Edit">{{icon "edit"}}</a>
           </li>
           {{- end}}

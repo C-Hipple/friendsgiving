@@ -1,0 +1,52 @@
+{{define "content"}}{{$p := .Page}}{{$d := $p.Dish}}{{$c := category $d.Category}}
+<div class="wrap narrow section-gap">
+  <a class="back-link" href="/potluck#dish-{{$d.ID}}">{{icon "arrow-back"}}Back to the potluck</a>
+
+  <div class="stack">
+    <p class="eyebrow">{{with $c}}{{.Label}}{{end}}</p>
+    {{template "dishCard" (dict "D" $d "User" .User "Here" true)}}
+  </div>
+
+  <h2 class="replies-head anchor" id="comments">{{icon "chat-bubble" "ink-pumpkin"}}{{len $p.Comments}} {{plural (len $p.Comments) "comment" "comments"}}</h2>
+
+  {{- with $p.Comments}}
+  <ol class="replies">
+    {{- range .}}
+    <li class="card reply" id="comment-{{.ID}}">
+      {{template "avatar" .Author}}
+      <div class="reply-main">
+        <div class="reply-meta">
+          <strong>{{.Author}}</strong>
+          {{- if same .Author $d.BroughtBy}}<span class="pill pill-pumpkin">Bringing it</span>{{end}}
+          <span class="muted small"><time title="{{stamp .CreatedAt}}">{{ago .CreatedAt}}</time></span>
+          {{- if same .Author $.User}}
+          <form method="post" action="/potluck/{{$d.ID}}/comments/{{.ID}}/delete" data-confirm="Delete this comment?">
+            <button class="icon-btn danger" type="submit" aria-label="Delete comment" title="Delete comment">{{icon "delete"}}</button>
+          </form>
+          {{- end}}
+        </div>
+        <div class="post-body">{{.Body}}</div>
+      </div>
+    </li>
+    {{- end}}
+  </ol>
+  {{- else}}
+  <p class="muted">No comments yet. {{if same $d.BroughtBy .User}}Questions from friends about your dish land here.{{else}}Ask {{$d.BroughtBy}} about it: what's in it, how many it serves, whether to save room.{{end}}</p>
+  {{- end}}
+
+  <form class="card composer anchor" id="latest" method="post" action="/potluck/{{$d.ID}}/comments">
+    <div class="composer-row">
+      {{template "avatar" .User}}
+      <div class="grow stack">
+        <label class="sr-only" for="comment-body">Your comment</label>
+        <textarea id="comment-body" name="body" rows="3" maxlength="5000" required placeholder="{{if same $d.BroughtBy .User}}Answer a question or add a note about your dish…{{else}}Ask {{$d.BroughtBy}} about it, or chime in…{{end}}">{{$p.Comment}}</textarea>
+        {{- with $p.CommentErr}}<p class="field-error">{{.}}</p>{{end}}
+      </div>
+    </div>
+    <div class="composer-foot">
+      <span class="muted small">Commenting as <strong>{{.User}}</strong> · Ctrl+Enter to send</span>
+      <button class="btn btn-primary" type="submit">Comment{{icon "send"}}</button>
+    </div>
+  </form>
+</div>
+{{end}}

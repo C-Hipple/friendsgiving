@@ -139,6 +139,60 @@ func TestDishOwnership(t *testing.T) {
 	}
 }
 
+func TestDishComments(t *testing.T) {
+	srv, store := newTestServer(t)
+	chris := loggedIn(t, srv, "Chris")
+	mike := loggedIn(t, srv, "Mike")
+	ctx := context.Background()
+
+	post(t, chris, srv.URL+"/potluck", url.Values{"name": {"Pecan pie"}, "category": {"dessert"}})
+	if resp := post(t, mike, srv.URL+"/potluck/1/comments", url.Values{"body": {"  "}}); resp.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("blank comment: got %d, want 422", resp.StatusCode)
+	}
+	if resp := post(t, mike, srv.URL+"/potluck/9/comments", url.Values{"body": {"Hi"}}); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("comment on a missing dish: got %d, want 404", resp.StatusCode)
+	}
+	resp := post(t, mike, srv.URL+"/potluck/1/comments", url.Values{"body": {"<b>Nut-free?</b>"}})
+	if loc := resp.Header.Get("Location"); resp.StatusCode != http.StatusSeeOther || loc != "/potluck/1#latest" {
+		t.Fatalf("comment: got %d to %q", resp.StatusCode, loc)
+	}
+	if d, _ := store.GetDish(ctx, 1); d.Comments != 1 || !d.AwaitingReply() {
+		t.Fatalf("after Mike asks: %+v", d)
+	}
+	_, body := get(t, chris, srv.URL+"/potluck")
+	if !strings.Contains(body, `title="New comment from Mike"`) || !strings.Contains(body, "1 comment") {
+		t.Error("potluck doesn't flag Mike's question for Chris")
+	}
+	if _, body := get(t, mike, srv.URL+"/potluck"); strings.Contains(body, "New comment from") {
+		t.Error("potluck flags Mike's own question for Mike")
+	}
+
+	post(t, chris, srv.URL+"/potluck/1/comments", url.Values{"body": {"Nope, it's pecan."}})
+	if d, _ := store.GetDish(ctx, 1); d.Comments != 2 || d.AwaitingReply() {
+		t.Fatalf("after Chris answers: %+v", d)
+	}
+	resp, body = get(t, mike, srv.URL+"/potluck/1")
+	if resp.StatusCode != http.StatusOK || !strings.Contains(body, "2 comments") ||
+		!strings.Contains(body, "&lt;b&gt;Nut-free?&lt;/b&gt;") || strings.Contains(body, "<b>Nut-free?</b>") ||
+		strings.Index(body, "Nut-free?") > strings.Index(body, "Nope, it&#39;s pecan.") || !strings.Contains(body, "Bringing it") {
+		t.Fatalf("dish page: status %d, body:\n%s", resp.StatusCode, body)
+	}
+
+	post(t, chris, srv.URL+"/potluck/1/comments/1/delete", nil) // Mike's: refused
+	if _, err := store.GetComment(ctx, 1); err != nil {
+		t.Fatalf("another user deleted a comment: %v", err)
+	}
+	post(t, mike, srv.URL+"/potluck/1/comments/1/delete", nil)
+	if _, err := store.GetComment(ctx, 1); err != errNotFound {
+		t.Fatalf("after delete: err = %v", err)
+	}
+
+	post(t, chris, srv.URL+"/potluck/1/delete", nil)
+	if comments, _ := store.ListComments(ctx, 1); len(comments) != 0 {
+		t.Fatalf("comments survived the dish: %d", len(comments))
+	}
+}
+
 func TestForumReplies(t *testing.T) {
 	srv, store := newTestServer(t)
 	chris := loggedIn(t, srv, "Chris")

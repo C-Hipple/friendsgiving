@@ -149,9 +149,12 @@ func (a *app) routes() http.Handler {
 
 	mux.HandleFunc("GET /potluck", a.potluck)
 	mux.HandleFunc("POST /potluck", a.createDish)
+	mux.HandleFunc("GET /potluck/{id}", a.dish)
 	mux.HandleFunc("GET /potluck/{id}/edit", a.editDish)
 	mux.HandleFunc("POST /potluck/{id}", a.updateDish)
 	mux.HandleFunc("POST /potluck/{id}/delete", a.deleteDish)
+	mux.HandleFunc("POST /potluck/{id}/comments", a.createComment)
+	mux.HandleFunc("POST /potluck/{id}/comments/{cid}/delete", a.deleteComment)
 
 	mux.HandleFunc("GET /forum", a.forum)
 	mux.HandleFunc("POST /forum", a.createThread)
