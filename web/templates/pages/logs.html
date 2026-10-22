@@ -1,0 +1,86 @@
+{{define "content"}}{{$p := .Page}}{{$f := $p.Filter}}
+<section class="page-head">
+  <div class="wrap">
+    <div class="head-card">
+      <span class="eyebrow-pill">{{icon "visibility-off"}} Unlisted · for the host</span>
+      <h1 class="display">Post log</h1>
+      <p class="lead">Every form anyone has sent: where it went, the name they were using, and the address it came from. Passwords are never stored.</p>
+    </div>
+  </div>
+</section>
+
+<div class="wrap section-gap">
+  <form class="card log-filters" method="get" action="/logs">
+    <div class="field">
+      <label for="log-user">Name</label>
+      <input id="log-user" name="user" value="{{$f.User}}" list="log-users" autocomplete="off" placeholder="Anyone">
+    </div>
+    <div class="field">
+      <label for="log-path">Endpoint</label>
+      <input id="log-path" name="path" value="{{$f.Path}}" list="log-paths" autocomplete="off" placeholder="e.g. /potluck or delete">
+    </div>
+    <div class="field">
+      <label for="log-ip">IP address</label>
+      <input id="log-ip" name="ip" value="{{$f.IP}}" list="log-ips" autocomplete="off" placeholder="Any address">
+    </div>
+    <div class="field">
+      <label for="log-q">Content</label>
+      <input id="log-q" name="q" type="search" value="{{$f.Text}}" autocomplete="off" placeholder="Words in what they sent">
+    </div>
+    <div class="log-filter-actions">
+      <button class="btn btn-primary" type="submit">Filter</button>
+      {{- if $f.Active}}
+      <a class="btn btn-quiet" href="/logs">Clear</a>
+      {{- end}}
+    </div>
+  </form>
+  <datalist id="log-users">{{range $p.Users}}<option value="{{.}}">{{end}}</datalist>
+  <datalist id="log-paths">{{range $p.Paths}}<option value="{{.}}">{{end}}</datalist>
+  <datalist id="log-ips">{{range $p.IPs}}<option value="{{.}}">{{end}}</datalist>
+
+  <div class="stack">
+    <p class="muted small">
+      {{- if lt (len $p.Entries) $p.Total}}Showing the newest {{len $p.Entries}} of {{$p.Total}} posts{{else}}{{$p.Total}} {{plural $p.Total "post" "posts"}}{{end}}
+      {{- if $f.Active}} matching these filters{{end}}. Click a name, address, or endpoint to filter by it.</p>
+    {{- with $p.Entries}}
+    <div class="table-scroll">
+      <table class="log-table">
+        <thead>
+          <tr><th scope="col">When</th><th scope="col">Name</th><th scope="col">IP address</th><th scope="col">Endpoint</th><th scope="col">Content</th></tr>
+        </thead>
+        <tbody>
+          {{- range .}}
+          <tr>
+            <td class="nowrap"><time datetime="{{.At.Format "2006-01-02T15:04:05Z07:00"}}" title="{{ago .At}}">{{.At.Format "Jan 2, 3:04:05 PM MST"}}</time></td>
+            <td>{{with .User}}<a class="who" href="/logs?user={{.}}">{{template "avatar" .}}<span>{{.}}</span></a>{{else}}<span class="faint">no name</span>{{end}}</td>
+            <td class="nowrap"><a class="mono" href="/logs?ip={{.IP}}">{{.IP}}</a></td>
+            <td class="nowrap"><a class="mono" href="/logs?path={{.Path}}">{{.Path}}</a> <span class="pill{{if ge .Status 400}} pill-warn{{end}}" title="HTTP status">{{.Status}}</span></td>
+            <td>
+              {{- with .Form}}
+              <dl class="log-form">
+                {{- range $k, $vs := .}}{{range $vs}}
+                <div><dt>{{$k}}</dt><dd>{{if .}}{{.}}{{else}}<span class="faint">empty</span>{{end}}</dd></div>
+                {{- end}}{{end}}
+              </dl>
+              {{- else}}<span class="faint">no fields</span>{{end}}
+            </td>
+          </tr>
+          {{- end}}
+        </tbody>
+      </table>
+    </div>
+    {{- else}}
+    <div class="card empty">
+      <span class="emoji" aria-hidden="true">📜</span>
+      {{- if $f.Active}}
+      <p class="title-md">Nothing matches those filters</p>
+      <a class="btn btn-white" href="/logs">Show everything</a>
+      {{- else}}
+      <p class="title-md">Nothing logged yet</p>
+      <p class="muted">Posts will show up here as people sign in, bring dishes, and talk in the forum.</p>
+      {{- end}}
+    </div>
+    {{- end}}
+  </div>
+</div>
+{{end}}

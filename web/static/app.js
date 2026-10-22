@@ -19,3 +19,21 @@ document.addEventListener("keydown", (e) => {
     e.target.form.requestSubmit();
   }
 });
+
+// The Claude page fills the name and password typed there into its
+// connection links. Neither leaves the page.
+const setup = document.querySelector("[data-mcp-setup]");
+if (setup) {
+  // encodeURIComponent, plus the characters that would break shell quotes.
+  const encode = (s) => encodeURIComponent(s).replace(/[!'()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
+  const slots = setup.querySelectorAll("[data-slot]");
+  for (const slot of slots) slot.dataset.blank = slot.textContent;
+  const fill = () => {
+    for (const slot of slots) {
+      const value = setup.querySelector(`input[name="${slot.dataset.slot}"]`).value;
+      slot.textContent = value ? encode(value) : slot.dataset.blank;
+    }
+  };
+  setup.addEventListener("input", fill);
+  fill();
+}

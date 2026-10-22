@@ -242,3 +242,93 @@ func mustRSVPs(t *testing.T, store *Store) []RSVP {
 	}
 	return rsvps
 }
+
+func TestPostLog(t *testing.T) {
+	srv, store := newTestServer(t)
+	ctx := context.Background()
+
+	post(t, guest(t), srv.URL+"/login", url.Values{"password": {"turkey?"}, "name": {"Mallory"}})
+	chris := loggedIn(t, srv, "Chris")
+	post(t, chris, srv.URL+"/potluck", url.Values{"name": {"Pie"}, "category": {"dessert"}, "notes": {"Pecan,\nwith 100% butter"}})
+	// A reverse proxy in front reports the real address.
+	req, _ := http.NewRequest("POST", srv.URL+"/forum", strings.NewReader(url.Values{"title": {"Rides"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Forwarded-For", "203.0.113.9")
+	resp, err := chris.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	all, total, err := store.PostLogs(ctx, LogFilter{}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 4 || len(all) != 4 {
+		t.Fatalf("got %d of %d entries, want 4", len(all), total)
+	}
+	if e := all[3]; e.Path != "/login" || e.Status != http.StatusUnauthorized || e.User != "" ||
+		e.Form.Get("name") != "Mallory" || e.Form.Get("password") != "[redacted]" {
+		t.Fatalf("failed login entry = %+v", e)
+	}
+	if e := all[1]; e.User != "Chris" || e.IP != "127.0.0.1" || e.Form.Get("notes") != "Pecan,\nwith 100% butter" {
+		t.Fatalf("dish entry = %+v", e)
+	}
+	if e := all[0]; e.Path != "/forum" || e.IP != "203.0.113.9" || e.Status != http.StatusSeeOther {
+		t.Fatalf("thread entry = %+v", e)
+	}
+
+	for _, c := range []struct {
+		f    LogFilter
+		want int
+	}{
+		{LogFilter{User: "chr"}, 2},
+		{LogFilter{Path: "/login"}, 2},
+		{LogFilter{IP: "203.0.113"}, 1},
+		{LogFilter{User: "Chris", Path: "/potluck"}, 1},
+		{LogFilter{Text: "100% BUTTER"}, 1},
+		{LogFilter{Text: "100_"}, 0},    // LIKE wildcards are taken literally
+		{LogFilter{Text: "title"}, 0},   // field names aren't content
+		{LogFilter{Text: "turkey?"}, 0}, // nor are passwords
+	} {
+		if got, n, err := store.PostLogs(ctx, c.f, 1); err != nil || n != c.want || len(got) > 1 {
+			t.Errorf("PostLogs(%+v) = %d entries of %d, %v; want %d", c.f, len(got), n, err, c.want)
+		}
+	}
+
+	resp, body := get(t, chris, srv.URL+"/logs?q=pecan")
+	if resp.StatusCode != http.StatusOK || !strings.Contains(body, "with 100% butter") || strings.Contains(body, "Mallory") {
+		t.Fatalf("filtered /logs: status %d, body:\n%s", resp.StatusCode, body)
+	}
+	if _, body := get(t, chris, srv.URL+"/logs"); strings.Contains(body, "turkey?") || strings.Contains(body, "gobble") {
+		t.Fatal("/logs shows a password")
+	}
+}
+
+func TestClientIP(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		onFly  bool
+		remote string
+		header string // header: value
+		want   string
+	}{
+		{"direct", false, "198.51.100.7:5123", "", "198.51.100.7"},
+		{"fly", true, "172.16.3.2:4000", "Fly-Client-IP: 203.0.113.9", "203.0.113.9"},
+		{"fly header off fly", false, "198.51.100.7:5123", "Fly-Client-IP: 203.0.113.9", "198.51.100.7"},
+		{"local proxy", false, "127.0.0.1:4000", "X-Forwarded-For: 10.0.0.1, 203.0.113.9", "203.0.113.9"},
+		{"forwarded by stranger", false, "198.51.100.7:5123", "X-Forwarded-For: 203.0.113.9", "198.51.100.7"},
+		{"mapped ipv4", false, "[::ffff:198.51.100.7]:5123", "", "198.51.100.7"},
+		{"ipv6", false, "[2001:db8::1]:5123", "", "2001:db8::1"},
+	} {
+		a := &app{cfg: config{OnFly: c.onFly}}
+		r := httptest.NewRequest("POST", "/forum", nil)
+		r.RemoteAddr = c.remote
+		if k, v, ok := strings.Cut(c.header, ": "); ok {
+			r.Header.Set(k, v)
+		}
+		if got := a.clientIP(r); got != c.want {
+			t.Errorf("%s: clientIP = %q, want %q", c.name, got, c.want)
+		}
+	}
+}

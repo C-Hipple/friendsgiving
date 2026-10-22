@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -63,6 +65,16 @@ CREATE TABLE IF NOT EXISTS guests (
 	created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS guests_by_rsvp ON guests (rsvp_id, created_at);
+
+CREATE TABLE IF NOT EXISTS post_log (
+	id         INTEGER PRIMARY KEY,
+	created_at INTEGER NOT NULL,
+	path       TEXT    NOT NULL,
+	status     INTEGER NOT NULL,
+	user_name  TEXT    NOT NULL,
+	ip         TEXT    NOT NULL,
+	form       TEXT    NOT NULL
+);
 `
 
 type Store struct {
@@ -84,34 +96,35 @@ func openStore(path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// The JSON names are what MCP tools take and return.
 type Dish struct {
-	ID        int64
-	Name      string
-	Category  string
-	NeedsOven bool
-	OvenNotes string
-	Notes     string
-	Tags      []string
-	BroughtBy string
-	CreatedAt time.Time
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Category  string    `json:"course"`
+	NeedsOven bool      `json:"needs_oven"`
+	OvenNotes string    `json:"oven_notes,omitempty"`
+	Notes     string    `json:"notes,omitempty"`
+	Tags      []string  `json:"dietary_tags,omitempty"`
+	BroughtBy string    `json:"brought_by"`
+	CreatedAt time.Time `json:"added_at"`
 }
 
 type Thread struct {
-	ID           int64
-	Title        string
-	Body         string
-	Author       string
-	CreatedAt    time.Time
-	LastActivity time.Time
-	ReplyCount   int
+	ID           int64     `json:"id"`
+	Title        string    `json:"title"`
+	Body         string    `json:"body"`
+	Author       string    `json:"author"`
+	CreatedAt    time.Time `json:"created_at"`
+	LastActivity time.Time `json:"last_activity_at"`
+	ReplyCount   int       `json:"reply_count"`
 }
 
 type Reply struct {
-	ID        int64
-	ThreadID  int64
-	Body      string
-	Author    string
-	CreatedAt time.Time
+	ID        int64     `json:"id"`
+	ThreadID  int64     `json:"thread_id"`
+	Body      string    `json:"body"`
+	Author    string    `json:"author"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 const dishCols = `id, name, category, needs_oven, oven_notes, notes, tags, brought_by, created_at`
@@ -267,23 +280,28 @@ func (s *Store) GetReply(ctx context.Context, id int64) (Reply, error) {
 	return r, err
 }
 
-func (s *Store) CreateReply(ctx context.Context, r Reply) error {
+func (s *Store) CreateReply(ctx context.Context, r Reply) (int64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer tx.Rollback()
 	now := time.Now().Unix()
-	if _, err := tx.ExecContext(ctx,
+	res, err := tx.ExecContext(ctx,
 		`INSERT INTO replies (thread_id, body, author, created_at) VALUES (?, ?, ?, ?)`,
-		r.ThreadID, r.Body, r.Author, now); err != nil {
-		return err
+		r.ThreadID, r.Body, r.Author, now)
+	if err != nil {
+		return 0, err
 	}
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE threads SET reply_count = reply_count + 1, last_activity_at = ? WHERE id = ?`, now, r.ThreadID); err != nil {
-		return err
+		return 0, err
 	}
-	return tx.Commit()
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return id, tx.Commit()
 }
 
 func (s *Store) DeleteReply(ctx context.Context, r Reply) error {
@@ -431,9 +449,9 @@ func (s *Store) DeleteGuest(ctx context.Context, id int64) error {
 
 // Person is anyone who has signed up for a dish or posted in the forum.
 type Person struct {
-	Name   string
-	Dishes int
-	Posts  int
+	Name   string `json:"name"`
+	Dishes int    `json:"dishes"`
+	Posts  int    `json:"posts"`
 }
 
 func (s *Store) People(ctx context.Context) ([]Person, error) {
@@ -487,4 +505,118 @@ func (s *Store) Counts(ctx context.Context) (Counts, error) {
 		c.LastPost, c.HasPosted = time.Unix(last.Int64, 0), true
 	}
 	return c, err
+}
+
+// PostLog is one POST request as the audit log saw it. Form holds the
+// submitted fields, with any password redacted.
+type PostLog struct {
+	ID     int64
+	At     time.Time
+	Path   string
+	Status int
+	User   string
+	IP     string
+	Form   url.Values
+}
+
+func (s *Store) LogPost(ctx context.Context, p PostLog) error {
+	form, err := json.Marshal(p.Form)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx,
+		`INSERT INTO post_log (created_at, path, status, user_name, ip, form) VALUES (?, ?, ?, ?, ?, ?)`,
+		time.Now().Unix(), p.Path, p.Status, p.User, p.IP, string(form))
+	return err
+}
+
+// LogFilter narrows the post log. Each non-empty field must appear, ignoring
+// case, in its column; Text searches the submitted values, not field names.
+type LogFilter struct {
+	User string
+	Path string
+	IP   string
+	Text string
+}
+
+func (f LogFilter) Active() bool { return f != (LogFilter{}) }
+
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+// PostLogs returns up to limit entries matching f, newest first, and how
+// many match in all.
+func (s *Store) PostLogs(ctx context.Context, f LogFilter, limit int) ([]PostLog, int, error) {
+	var where []string
+	var args []any
+	contains := func(cond, v string) {
+		if v != "" {
+			where = append(where, cond)
+			args = append(args, "%"+likeEscaper.Replace(v)+"%")
+		}
+	}
+	contains(`user_name LIKE ? ESCAPE '\'`, f.User)
+	contains(`path LIKE ? ESCAPE '\'`, f.Path)
+	contains(`ip LIKE ? ESCAPE '\'`, f.IP)
+	contains(`EXISTS (SELECT 1 FROM json_tree(form) WHERE type = 'text' AND value LIKE ? ESCAPE '\')`, f.Text)
+	cond := ""
+	if len(where) > 0 {
+		cond = " WHERE " + strings.Join(where, " AND ")
+	}
+
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM post_log`+cond, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, created_at, path, status, user_name, ip, form FROM post_log`+cond+` ORDER BY id DESC LIMIT ?`,
+		append(args, limit)...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var out []PostLog
+	for rows.Next() {
+		var p PostLog
+		var created int64
+		var form string
+		if err := rows.Scan(&p.ID, &created, &p.Path, &p.Status, &p.User, &p.IP, &form); err != nil {
+			return nil, 0, err
+		}
+		p.At = time.Unix(created, 0)
+		if err := json.Unmarshal([]byte(form), &p.Form); err != nil {
+			return nil, 0, err
+		}
+		out = append(out, p)
+	}
+	return out, total, rows.Err()
+}
+
+// PostLogSuggestions lists the names, paths, and IPs seen in the post log,
+// most frequent first, to offer as filter values.
+func (s *Store) PostLogSuggestions(ctx context.Context) (users, paths, ips []string, err error) {
+	distinct := func(col string) ([]string, error) {
+		rows, err := s.db.QueryContext(ctx,
+			`SELECT `+col+` FROM post_log WHERE `+col+` != '' GROUP BY `+col+` ORDER BY COUNT(*) DESC, `+col)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		var out []string
+		for rows.Next() {
+			var v string
+			if err := rows.Scan(&v); err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		return out, rows.Err()
+	}
+	if users, err = distinct("user_name"); err != nil {
+		return
+	}
+	if paths, err = distinct("path"); err != nil {
+		return
+	}
+	ips, err = distinct("ip")
+	return
 }
