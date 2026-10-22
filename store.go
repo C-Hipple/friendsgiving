@@ -323,10 +323,10 @@ func (s *Store) DeleteReply(ctx context.Context, r Reply) error {
 // RSVP is one person's answer, plus anyone they're bringing. Like dishes and
 // posts, it belongs to whoever holds the name.
 type RSVP struct {
-	ID     int64
-	Name   string
-	Going  bool
-	Guests []Guest
+	ID     int64   `json:"-"`
+	Name   string  `json:"name"`
+	Going  bool    `json:"going"`
+	Guests []Guest `json:"guests,omitempty"`
 }
 
 // Size counts the person who RSVPed and their guests.
@@ -350,10 +350,10 @@ func (r RSVP) guests(kids bool) []Guest {
 }
 
 type Guest struct {
-	ID   int64
-	Name string
-	Kid  bool
-	By   string // who added them
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+	Kid  bool   `json:"kid"`
+	By   string `json:"-"` // who added them
 }
 
 func (s *Store) ListRSVPs(ctx context.Context) ([]RSVP, error) {

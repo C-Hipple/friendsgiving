@@ -4,7 +4,7 @@
     <div class="head-card">
       <span class="eyebrow-pill">{{icon "celebration"}} MCP server</span>
       <h1 class="display">Bring your Claude</h1>
-      <p class="lead">{{.Event.Name}} has an MCP server, so Claude can check the plan, sign you up for a dish, and keep up with the forum for you. It gets in with the site password and posts under whatever name you give it.</p>
+      <p class="lead">{{.Event.Name}} has an MCP server, so Claude can check the plan, RSVP, sign you up for a dish, and keep up with the forum for you. It gets in with the site password and posts under whatever name you give it.</p>
     </div>
   </div>
 </section>
@@ -19,7 +19,7 @@
     <div class="field">
       <label for="mcp-name">Name to post as</label>
       <input id="mcp-name" name="name" value="{{.User}}" maxlength="40" autocomplete="off">
-      <p class="small muted">Keep it as {{.User}} and you and Claude can edit each other's dishes and posts. Pick another, like “{{.User}}'s Claude”, to keep them apart.</p>
+      <p class="small muted">Keep it as {{.User}} so Claude can RSVP for you, and so you and Claude can edit each other's dishes and posts. Pick another, like “{{.User}}'s Claude”, to keep them apart.</p>
     </div>
     <div class="field">
       <label for="mcp-password">Site password</label>

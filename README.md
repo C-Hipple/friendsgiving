@@ -17,8 +17,8 @@ A small, private coordination site for Thanksgiving: a potluck sign-up board
   in a cookie, and people can edit or delete only the dishes and posts under
   their current name.
 - **Bring your Claude**: an MCP server at `/mcp` lets Claude (or any MCP
-  client) read the plan, claim dishes, and post in the forum. Setup steps are
-  at `/mcp/docs`, linked from the footer.
+  client) read the plan, RSVP, claim dishes, and post in the forum. Setup
+  steps are at `/mcp/docs`, linked from the footer.
 
 It's a single Go binary with SQLite, server-rendered HTML, one stylesheet,
 self-hosted fonts and icons, and a few lines of optional JavaScript. Pages
@@ -89,8 +89,11 @@ claude mcp add --transport http brogiving 'https://your-site/mcp?name=Chris&pass
 ```
 
 The name is who Claude posts as, with the same ownership rules as the site.
-Tools cover the event details, the potluck (list, add, update, remove
-dishes), the forum (list, read, start, reply, delete), and who's involved.
+Tools cover the event details, RSVPs (the guest list, answering, adding and
+removing guests), the potluck (list, add, update, remove dishes), the forum
+(list, read, start, reply, delete), and who's involved. RSVPs count whoever
+holds the name, so an RSVP under a name like "Chris's Claude" counts one more
+person coming.
 
 ## Develop
 
