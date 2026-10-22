@@ -1,0 +1,63 @@
+{{define "content"}}{{$p := .Page}}{{$t := $p.Thread}}
+<div class="wrap narrow section-gap">
+  <a class="back-link" href="/forum">{{icon "arrow-back"}}All threads</a>
+
+  <article class="card card-lg thread-main">
+    <div class="thread-meta">
+      {{template "avatar" $t.Author}}
+      <div class="grow">
+        <strong>{{$t.Author}}</strong>
+        <span class="muted small"><time title="{{stamp $t.CreatedAt}}">{{ago $t.CreatedAt}}</time></span>
+      </div>
+      {{- if same $t.Author .User}}
+      <form method="post" action="/forum/{{$t.ID}}/delete" data-confirm="Delete this thread and all of its replies?">
+        <button class="icon-btn danger" type="submit" aria-label="Delete thread" title="Delete thread">{{icon "delete"}}</button>
+      </form>
+      {{- end}}
+    </div>
+    <h1 class="h-lg">{{$t.Title}}</h1>
+    {{- with $t.Body}}
+    <div class="post-body">{{.}}</div>
+    {{- end}}
+  </article>
+
+  <h2 class="replies-head">{{icon "chat-bubble" "ink-pumpkin"}}{{len $p.Replies}} {{plural (len $p.Replies) "reply" "replies"}}</h2>
+
+  {{- with $p.Replies}}
+  <ol class="replies">
+    {{- range .}}
+    <li class="card reply" id="reply-{{.ID}}">
+      {{template "avatar" .Author}}
+      <div class="reply-main">
+        <div class="reply-meta">
+          <strong>{{.Author}}</strong>
+          <span class="muted small"><time title="{{stamp .CreatedAt}}">{{ago .CreatedAt}}</time></span>
+          {{- if same .Author $.User}}
+          <form method="post" action="/forum/{{$t.ID}}/replies/{{.ID}}/delete" data-confirm="Delete this reply?">
+            <button class="icon-btn danger" type="submit" aria-label="Delete reply" title="Delete reply">{{icon "delete"}}</button>
+          </form>
+          {{- end}}
+        </div>
+        <div class="post-body">{{.Body}}</div>
+      </div>
+    </li>
+    {{- end}}
+  </ol>
+  {{- end}}
+
+  <form class="card composer anchor" id="latest" method="post" action="/forum/{{$t.ID}}/replies">
+    <div class="composer-row">
+      {{template "avatar" .User}}
+      <div class="grow stack">
+        <label class="sr-only" for="reply-body">Your reply</label>
+        <textarea id="reply-body" name="body" rows="3" maxlength="5000" required placeholder="Add to the conversation…">{{$p.Reply}}</textarea>
+        {{- with $p.ReplyErr}}<p class="field-error">{{.}}</p>{{end}}
+      </div>
+    </div>
+    <div class="composer-foot">
+      <span class="muted small">Replying as <strong>{{.User}}</strong> · Ctrl+Enter to send</span>
+      <button class="btn btn-primary" type="submit">Reply{{icon "send"}}</button>
+    </div>
+  </form>
+</div>
+{{end}}

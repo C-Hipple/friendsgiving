@@ -1,0 +1,177 @@
+{{define "content"}}{{$m := .Page.Menu}}
+<section class="hero hero-cranberry">
+  <div class="hero-deco" aria-hidden="true">
+    <svg class="deco-leaf" viewBox="0 0 200 200"><path d="M100 0C120 40 180 60 200 100 160 120 140 180 100 200 80 160 20 140 0 100 40 80 60 20 100 0Z"/></svg>
+    <svg class="deco-circle" viewBox="0 0 200 200"><circle cx="100" cy="100" r="80"/></svg>
+  </div>
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow-pill">{{icon "celebration"}} Thanksgiving 2026</span>
+      <h1 class="display">{{.Event.Name}}</h1>
+      <p class="lead">Bring your appetite, your signature dish, and your stretchiest pants. Claim what you're cooking, call dibs on oven time, and talk trash in the forum.</p>
+      <div class="btn-row">
+        <a class="btn btn-primary btn-lg" href="/potluck#bring">{{icon "add"}}Bring a dish</a>
+        <a class="btn btn-glass btn-lg" href="/details">{{icon "schedule"}}Event details</a>
+      </div>
+    </div>
+
+    <div class="card hero-card">
+      <div class="hero-card-head">
+        <span class="icon-bubble">{{icon "calendar-month"}}</span>
+        <div class="grow">
+          <p class="label-sm muted">Date &amp; time</p>
+          <p class="title-md">{{template "date" .Event}}</p>
+        </div>
+        <span class="pill pill-cranberry">{{if tbd .Event.Time}}Time TBD{{else}}{{.Event.Time}}{{end}}</span>
+      </div>
+      <div class="hero-card-body">
+        <div class="info-row">
+          {{icon "location-on"}}
+          <div>
+            <p class="strong">{{template "place" .Event}}</p>
+            <p class="muted small">{{with .Event.Address}}{{.}}{{else}}We'll post the address once it's locked in.{{end}}</p>
+          </div>
+        </div>
+        {{- if or (tbd .Event.Date) (tbd .Event.Location)}}
+        <p class="note">{{icon "info"}}<span>Details are still cooking. Check back here for updates.</span></p>
+        {{- end}}
+        <a class="link" href="/details">Full event details {{icon "arrow-forward"}}</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap section-gap">
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-head"><span>Dishes pledged</span>{{icon "dinner-dining"}}</div>
+      <div class="stat-num"><strong class="ink-cranberry">{{$m.Total}}</strong><span>from {{$m.Cooks}} {{plural $m.Cooks "friend" "friends"}}</span></div>
+      <div class="bar">{{range $m.Courses}}{{if .Dishes}}<span class="tone-{{.Tone}}" style="width: {{pct (len .Dishes) $m.Total}}%" title="{{.Plural}}: {{len .Dishes}}"></span>{{end}}{{end}}</div>
+      <p class="stat-foot">{{if $m.Missing}}{{icon "help"}}Still need {{courses $m.Missing}}{{else}}{{icon "check-circle"}}Every course is covered{{end}}</p>
+    </div>
+    <div class="stat">
+      <div class="stat-head"><span>Need the oven</span>{{icon "local-fire-department"}}</div>
+      <div class="stat-num"><strong class="ink-pumpkin">{{len $m.Oven}}</strong><span>of {{$m.Total}} {{plural $m.Total "dish" "dishes"}}</span></div>
+      <div class="bar"><span class="tone-pumpkin" style="width: {{pct (len $m.Oven) $m.Total}}%"></span></div>
+      <p class="stat-foot"><a class="link" href="/potluck#oven">{{icon "schedule"}}See the oven lineup</a></p>
+    </div>
+    <div class="stat">
+      <div class="stat-head"><span>Courses covered</span>{{icon "restaurant"}}</div>
+      <div class="stat-num"><strong class="ink-sage">{{$m.Covered}}</strong><span>of {{len $m.Courses}} courses</span></div>
+      <div class="pips">{{range $m.Courses}}<span class="tone-{{.Tone}}{{if .Dishes}} on{{end}}" title="{{.Plural}}"></span>{{end}}</div>
+      <p class="stat-foot">{{range $i, $c := $m.Courses}}{{if $i}} · {{end}}<span{{if not $c.Dishes}} class="faint"{{end}}>{{$c.Plural}}</span>{{end}}</p>
+    </div>
+    <div class="stat">
+      <div class="stat-head"><span>Forum chatter</span>{{icon "forum"}}</div>
+      <div class="stat-num"><strong>{{.Counts.Threads}}</strong><span>{{plural .Counts.Threads "thread" "threads"}} · {{.Counts.Replies}} {{plural .Counts.Replies "reply" "replies"}}</span></div>
+      <p class="stat-foot">{{icon "chat-bubble"}}{{if .Counts.HasPosted}}Last post {{ago .Counts.LastPost}}{{else}}Be the first to post{{end}}</p>
+    </div>
+  </div>
+
+  <div class="grid-12">
+    <div class="span-7 stack-lg">
+      <section class="card card-lg">
+        <div class="card-title-row">
+          <div>
+            <p class="eyebrow">Your plate</p>
+            <h2 class="h-md">What you're bringing</h2>
+          </div>
+          {{- if .Page.Mine}}<span class="pill pill-sage">{{icon "check-circle"}}{{len .Page.Mine}} {{plural (len .Page.Mine) "dish" "dishes"}} claimed</span>{{end}}
+        </div>
+        {{- with .Page.Mine}}
+        <ul class="mini-list">
+          {{- range .}}{{$c := category .Category}}
+          <li class="mini-item">
+            <span class="icon-bubble sm tone-{{$c.Tone}}">{{icon $c.Icon}}</span>
+            <div class="grow">
+              <a class="strong" href="/potluck#dish-{{.ID}}">{{.Name}}</a>
+              <p class="muted small">{{$c.Label}}{{if .NeedsOven}} · needs the oven{{with .OvenNotes}} ({{.}}){{end}}{{end}}</p>
+            </div>
+            <a class="icon-btn" href="/potluck/{{.ID}}/edit" aria-label="Edit {{.Name}}" title="Edit">{{icon "edit"}}</a>
+          </li>
+          {{- end}}
+        </ul>
+        <a class="btn btn-white" href="/potluck#bring">{{icon "add"}}Bring something else</a>
+        {{- else}}
+        <div class="empty">
+          <span class="emoji" aria-hidden="true">🥧</span>
+          <p>You haven't claimed a dish yet, {{.User}}.</p>
+          <a class="btn btn-primary" href="/potluck#bring">{{icon "add"}}Bring a dish</a>
+        </div>
+        {{- end}}
+      </section>
+
+      <section class="card card-lg">
+        <div class="card-title-row">
+          <h2 class="h-md">The menu so far</h2>
+          <span class="muted small">{{$m.Total}} {{plural $m.Total "dish" "dishes"}}</span>
+        </div>
+        <ul class="course-list">
+          {{- range $m.Courses}}
+          <li class="course-row">
+            <span class="icon-bubble sm tone-{{.Tone}}">{{icon .Icon}}</span>
+            <div class="grow">
+              <h3>{{.Plural}} <span class="count">{{len .Dishes}}</span></h3>
+              {{- if .Dishes}}
+              <p>{{range $i, $d := .Dishes}}{{if $i}}, {{end}}{{$d.Name}} <span class="faint">({{$d.BroughtBy}})</span>{{end}}</p>
+              {{- else}}
+              <p>Nobody yet. <a class="link" href="/potluck?add={{.Key}}#bring">Claim one</a></p>
+              {{- end}}
+            </div>
+          </li>
+          {{- end}}
+        </ul>
+      </section>
+    </div>
+
+    <div class="span-5 stack-lg">
+      <section class="card card-lg">
+        <div class="card-title-row">
+          <h2 class="h-md">{{icon "forum" "ink-pumpkin"}} Latest from the forum</h2>
+        </div>
+        {{- with .Page.Threads}}
+        <ul class="thread-mini">
+          {{- range .}}
+          <li>
+            {{template "avatar" .Author}}
+            <div class="grow">
+              <a class="strong" href="/forum/{{.ID}}">{{.Title}}</a>
+              <p class="muted small">{{.Author}} · {{.ReplyCount}} {{plural .ReplyCount "reply" "replies"}} · <time title="{{stamp .LastActivity}}">{{ago .LastActivity}}</time></p>
+            </div>
+          </li>
+          {{- end}}
+        </ul>
+        {{- else}}
+        <div class="empty">
+          <span class="emoji" aria-hidden="true">💬</span>
+          <p>It's quiet in here. Start the first thread.</p>
+        </div>
+        {{- end}}
+        <a class="btn btn-white btn-block" href="/forum">Open the forum {{icon "arrow-forward"}}</a>
+      </section>
+
+      <section class="card card-lg card-tint">
+        <p class="eyebrow">The plan</p>
+        <h2 class="h-md">How this works</h2>
+        <ol class="how">
+          <li><span><strong>Claim a dish.</strong> Pick a course and tell us if it needs the oven.</span></li>
+          <li><span><strong>Check the gaps.</strong> The menu shows which courses still need someone.</span></li>
+          <li><span><strong>Talk it out.</strong> Rides, recipes, and games go in the forum.</span></li>
+        </ol>
+      </section>
+    </div>
+  </div>
+
+  <section class="cta-band">
+    <div>
+      <p class="eyebrow">Potluck coordination</p>
+      <h2 class="h-lg">Have a recipe in mind for the feast?</h2>
+      <p class="muted">{{if $m.Missing}}We still need {{courses $m.Missing}}. Claim a slot and let everyone know if it needs time in the oven.{{else}}Every course has something on it, but there's always room for one more pie.{{end}}</p>
+    </div>
+    <div class="cta-actions">
+      <a class="btn btn-cranberry btn-lg" href="/potluck">Open the potluck board</a>
+      <a class="btn btn-white btn-lg" href="/forum#new">Start a forum thread</a>
+    </div>
+  </section>
+</div>
+{{end}}

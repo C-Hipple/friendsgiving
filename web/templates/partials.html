@@ -1,0 +1,92 @@
+{{define "avatar"}}<span class="avatar tone-{{tone .}}" aria-hidden="true">{{initials .}}</span>{{end}}
+
+{{define "date"}}{{if tbd .Date}}Date TBD{{else}}{{.Date}}{{end}}{{end}}
+
+{{define "place"}}{{if tbd .Location}}Location TBD{{else}}{{.Location}}{{end}}{{end}}
+
+{{/* dishCard expects (dict "D" Dish "User" currentUserName) */}}
+{{define "dishCard"}}{{$d := .D}}
+<article class="dish-card" id="dish-{{$d.ID}}">
+  <div class="dish-top">
+    {{- if $d.NeedsOven}}
+    <span class="pill pill-oven">{{icon "local-fire-department"}}<span>Needs oven{{with $d.OvenNotes}}: {{.}}{{end}}</span></span>
+    {{- else}}
+    <span class="pill pill-cool">{{icon "check"}}<span>No oven needed</span></span>
+    {{- end}}
+  </div>
+  <h3 class="dish-name">{{$d.Name}}</h3>
+  {{- with $d.Notes}}
+  <p class="dish-notes">{{.}}</p>
+  {{- end}}
+  {{- with $d.Tags}}
+  <div class="tags">{{range .}}{{with tag .}}<span class="pill{{if .Warn}} pill-warn{{end}}">{{.Label}}</span>{{end}}{{end}}</div>
+  {{- end}}
+  <div class="dish-foot">
+    <span class="who">{{template "avatar" $d.BroughtBy}}<span>{{$d.BroughtBy}}</span></span>
+    {{- if same $d.BroughtBy .User}}
+    <span class="dish-actions">
+      <a class="icon-btn" href="/potluck/{{$d.ID}}/edit" aria-label="Edit {{$d.Name}}" title="Edit">{{icon "edit"}}</a>
+      <form method="post" action="/potluck/{{$d.ID}}/delete" data-confirm="Take {{$d.Name}} off the menu?">
+        <button class="icon-btn danger" type="submit" aria-label="Remove {{$d.Name}}" title="Remove">{{icon "delete"}}</button>
+      </form>
+    </span>
+    {{- else}}
+    <time class="muted small" datetime="{{$d.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}" title="{{stamp $d.CreatedAt}}">{{ago $d.CreatedAt}}</time>
+    {{- end}}
+  </div>
+</article>
+{{end}}
+
+{{/* dishForm expects (dict "Form" dishForm "Action" url "Submit" label "Icon" icon "Cancel" url-or-empty) */}}
+{{define "dishForm"}}{{$f := .Form}}
+<form class="dish-form" method="post" action="{{.Action}}">
+  <div class="field">
+    <label for="dish-name">What are you bringing?</label>
+    <input id="dish-name" name="name" value="{{$f.Dish.Name}}" maxlength="80" required autocomplete="off" placeholder="e.g. Grandma's sweet potato casserole">
+    {{- with index $f.Errors "name"}}<p class="field-error">{{.}}</p>{{end}}
+  </div>
+
+  <fieldset class="field">
+    <legend>Course</legend>
+    <div class="choices">
+      {{- range categories}}
+      <label class="choice"><input type="radio" name="category" value="{{.Key}}" required{{if eq .Key $f.Dish.Category}} checked{{end}}><span>{{icon .Icon}}{{.Label}}</span></label>
+      {{- end}}
+    </div>
+    {{- with index $f.Errors "category"}}<p class="field-error">{{.}}</p>{{end}}
+  </fieldset>
+
+  <div class="oven-box">
+    <label class="switch">
+      <input type="checkbox" name="needs_oven" value="1"{{if $f.Dish.NeedsOven}} checked{{end}}>
+      <span class="switch-track" aria-hidden="true"></span>
+      <span class="switch-label"><strong>{{icon "local-fire-department"}} Needs the oven</strong><span>Turn this on if it has to bake or reheat at the party.</span></span>
+    </label>
+    <div class="field oven-details">
+      <label for="oven-notes">Oven details <span class="optional">optional</span></label>
+      <input id="oven-notes" name="oven_notes" value="{{$f.Dish.OvenNotes}}" maxlength="80" autocomplete="off" placeholder="e.g. 350°F for 30 min, or just a reheat">
+      {{- with index $f.Errors "oven_notes"}}<p class="field-error">{{.}}</p>{{end}}
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="dish-notes">Notes <span class="optional">optional</span></label>
+    <textarea id="dish-notes" name="notes" rows="2" maxlength="280" placeholder="Serves 10. Secret family recipe. Bringing extra gravy.">{{$f.Dish.Notes}}</textarea>
+    {{- with index $f.Errors "notes"}}<p class="field-error">{{.}}</p>{{end}}
+  </div>
+
+  <fieldset class="field">
+    <legend>Dietary notes <span class="optional">optional</span></legend>
+    <div class="choices">
+      {{- range dietTags}}
+      <label class="choice choice-tag{{if .Warn}} warn{{end}}"><input type="checkbox" name="tags" value="{{.Key}}"{{if $f.HasTag .Key}} checked{{end}}><span>{{.Label}}</span></label>
+      {{- end}}
+    </div>
+  </fieldset>
+
+  <div class="form-actions">
+    {{- with .Cancel}}<a class="btn btn-quiet" href="{{.}}">Cancel</a>{{end}}
+    <button class="btn btn-primary" type="submit">{{icon .Icon}}{{.Submit}}</button>
+  </div>
+</form>
+{{end}}

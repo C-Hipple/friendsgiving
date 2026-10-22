@@ -1,0 +1,110 @@
+{{define "content"}}{{$p := .Page}}
+<section class="hero hero-pumpkin">
+  <div class="hero-deco" aria-hidden="true">
+    <svg class="deco-circle right" viewBox="0 0 200 200"><circle cx="100" cy="100" r="80"/></svg>
+  </div>
+  <div class="wrap hero-copy">
+    <span class="eyebrow-pill">{{icon "forum"}} {{.Event.Name}} · The parlor</span>
+    <h1 class="display">Feast Forum &amp; Banter</h1>
+    <p class="lead">Debate sweet potato toppings, sort out rides, assemble trivia teams, and plan the post-pie games.</p>
+    <div class="chip-row">
+      <span class="glass-chip"><span class="live-dot"></span>{{len $p.Threads}} {{plural (len $p.Threads) "thread" "threads"}}</span>
+      <span class="glass-chip">{{icon "group"}}{{len $p.People}} {{plural (len $p.People) "friend" "friends"}} at the table</span>
+    </div>
+  </div>
+</section>
+
+<div class="wrap section-gap">
+  <div class="grid-12">
+    <div class="span-8 stack-lg">
+      <form class="card composer anchor" id="new" method="post" action="/forum">
+        <div class="composer-row">
+          {{template "avatar" .User}}
+          <div class="grow stack">
+            <label class="sr-only" for="thread-title">Title</label>
+            <input id="thread-title" name="title" value="{{$p.Form.Title}}" maxlength="120" required autocomplete="off" placeholder="Start a thread: propose a game, ask for a ride, settle a debate…">
+            {{- with index $p.Form.Errors "title"}}<p class="field-error">{{.}}</p>{{end}}
+            <label class="sr-only" for="thread-body">Message</label>
+            <textarea id="thread-body" name="body" rows="3" maxlength="5000" placeholder="Add some details (optional)">{{$p.Form.Body}}</textarea>
+            {{- with index $p.Form.Errors "body"}}<p class="field-error">{{.}}</p>{{end}}
+          </div>
+        </div>
+        <div class="composer-foot">
+          <span class="muted small">Posting as <strong>{{.User}}</strong></span>
+          <button class="btn btn-primary" type="submit">Post to forum{{icon "send"}}</button>
+        </div>
+      </form>
+
+      {{- range $p.Threads}}
+      <article class="card thread-card">
+        <div class="thread-meta">
+          {{template "avatar" .Author}}
+          <div class="grow">
+            <strong>{{.Author}}</strong>
+            <span class="muted small">started <time title="{{stamp .CreatedAt}}">{{ago .CreatedAt}}</time></span>
+          </div>
+          <span class="muted small">Active <time title="{{stamp .LastActivity}}">{{ago .LastActivity}}</time></span>
+        </div>
+        <h2 class="h-thread"><a class="stretched" href="/forum/{{.ID}}">{{.Title}}</a></h2>
+        {{- with .Body}}
+        <p class="muted">{{excerpt . 240}}</p>
+        {{- end}}
+        <div class="thread-foot">
+          <span class="pill">{{icon "chat-bubble"}}{{.ReplyCount}} {{plural .ReplyCount "reply" "replies"}}</span>
+          <span class="link">Join thread {{icon "arrow-forward"}}</span>
+        </div>
+      </article>
+      {{- else}}
+      <div class="card empty">
+        <span class="emoji" aria-hidden="true">🦃</span>
+        <p class="title-md">No threads yet</p>
+        <p class="muted">Start the first one. Carpools, trivia teams, and the great marshmallow debate won't settle themselves.</p>
+      </div>
+      {{- end}}
+    </div>
+
+    <aside class="span-4 stack-lg">
+      <section class="card bulletin">
+        <p class="label-sm ink-cranberry">{{icon "celebration"}} House rules</p>
+        <h2 class="h-sm">Keep it festive</h2>
+        <p class="small">Be nice, roast the food (not each other), and take carpools and dish questions here so they don't get lost in the group chat.</p>
+      </section>
+
+      <section class="card">
+        <div class="card-title-row">
+          <h2 class="title-md">{{icon "group" "ink-sage"}} Friends at the table</h2>
+          <span class="muted small">{{len $p.People}}</span>
+        </div>
+        {{- with $p.People}}
+        <ul class="people">
+          {{- range .}}
+          <li class="person">
+            {{template "avatar" .Name}}
+            <div class="grow">
+              <strong>{{.Name}}</strong>
+              <span class="muted small">{{if .Dishes}}{{.Dishes}} {{plural .Dishes "dish" "dishes"}}{{end}}{{if and .Dishes .Posts}} · {{end}}{{if .Posts}}{{.Posts}} {{plural .Posts "post" "posts"}}{{end}}</span>
+            </div>
+          </li>
+          {{- end}}
+        </ul>
+        {{- else}}
+        <p class="muted small">Nobody's signed up or posted yet.</p>
+        {{- end}}
+      </section>
+
+      <section class="card">
+        <div class="card-title-row">
+          <h2 class="title-md">{{icon "dinner-dining" "ink-pumpkin"}} Potluck snapshot</h2>
+          <span class="muted small">{{$p.Menu.Total}} {{plural $p.Menu.Total "dish" "dishes"}}</span>
+        </div>
+        <ul class="snapshot">
+          {{- range $p.Menu.Courses}}
+          <li><span class="dot tone-{{.Tone}}"></span><span class="grow">{{.Plural}}</span><strong{{if not .Dishes}} class="faint"{{end}}>{{len .Dishes}}</strong></li>
+          {{- end}}
+        </ul>
+        <a class="btn btn-white btn-block" href="/potluck">Open the potluck {{icon "arrow-forward"}}</a>
+      </section>
+    </aside>
+  </div>
+</div>
+{{end}}

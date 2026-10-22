@@ -1,0 +1,19 @@
+{{define "content"}}{{$p := .Page}}
+<div class="wrap narrow section-gap">
+  <a class="back-link" href="/potluck#dish-{{$p.ID}}">{{icon "arrow-back"}}Back to the potluck</a>
+  <section class="card card-lg">
+    <div class="card-head">
+      <span class="icon-bubble">{{icon "edit"}}</span>
+      <div>
+        <p class="eyebrow">Edit your dish</p>
+        <h1 class="h-lg">{{$p.Name}}</h1>
+      </div>
+    </div>
+    {{template "dishForm" (dict "Form" $p.Form "Action" (printf "/potluck/%d" $p.ID) "Submit" "Save changes" "Icon" "check" "Cancel" (printf "/potluck#dish-%d" $p.ID))}}
+  </section>
+  <form class="danger-zone" method="post" action="/potluck/{{$p.ID}}/delete" data-confirm="Take {{$p.Name}} off the menu?">
+    <span class="muted small">Plans changed?</span>
+    <button class="btn btn-quiet danger" type="submit">{{icon "delete"}}Remove from the menu</button>
+  </form>
+</div>
+{{end}}

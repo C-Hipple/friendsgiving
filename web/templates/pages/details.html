@@ -1,0 +1,105 @@
+{{define "content"}}{{$m := .Page}}
+<section class="page-head">
+  <div class="wrap">
+    <div class="head-card">
+      <div class="head-row">
+        <div>
+          <span class="eyebrow-pill">{{icon "info"}} The plan</span>
+          <h1 class="display">Event Details</h1>
+          <p class="lead">Everything you need to know to show up hungry for {{.Event.Name}}.{{if or (tbd .Event.Date) (tbd .Event.Location)}} A few details are still cooking. We'll update this page as soon as they're set.{{end}}</p>
+        </div>
+        <div class="head-chips">
+          <div class="mini-stat">{{icon "calendar-month" "ink-pumpkin"}}<div><span class="label-sm muted">Date</span><strong>{{if tbd .Event.Date}}TBD{{else}}{{.Event.Date}}{{end}}</strong></div></div>
+          <div class="mini-stat">{{icon "location-on" "ink-cranberry"}}<div><span class="label-sm muted">Location</span><strong>{{if tbd .Event.Location}}TBD{{else}}{{.Event.Location}}{{end}}</strong></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap section-gap">
+  <div class="detail-grid">
+    <article class="card card-lg detail-card">
+      <span class="icon-bubble lg tone-pumpkin">{{icon "calendar-month"}}</span>
+      <p class="eyebrow">When</p>
+      <h2 class="big">{{if tbd .Event.Date}}TBD{{else}}{{.Event.Date}}{{end}}</h2>
+      <p class="title-md muted">{{if tbd .Event.Time}}Time to be announced{{else}}{{.Event.Time}}{{end}}</p>
+      {{- if or (tbd .Event.Date) (tbd .Event.Time)}}
+      <p class="note">{{icon "schedule"}}<span>We're still locking in the timing. Keep an eye on this page.</span></p>
+      {{- end}}
+    </article>
+    <article class="card card-lg detail-card">
+      <span class="icon-bubble lg tone-cranberry">{{icon "location-on"}}</span>
+      <p class="eyebrow">Where</p>
+      <h2 class="big">{{if tbd .Event.Location}}TBD{{else}}{{.Event.Location}}{{end}}</h2>
+      {{- with .Event.Address}}
+      <p class="title-md muted">{{.}}</p>
+      <a class="btn btn-white" href="{{mapsURL .}}" target="_blank" rel="noopener">{{icon "map" "ink-cranberry"}}Open in Maps</a>
+      {{- else}}
+      <p class="title-md muted">Venue to be announced</p>
+      <p class="note">{{icon "map"}}<span>The address will show up here once we've picked a spot.</span></p>
+      {{- end}}
+    </article>
+  </div>
+
+  <section class="card card-lg">
+    <div class="card-title-row">
+      <div>
+        <p class="eyebrow">Feast day prep</p>
+        <h2 class="h-md">How {{.Event.Name}} works</h2>
+      </div>
+    </div>
+    <ol class="steps">
+      <li class="step">
+        <span class="step-num">1</span>
+        <h3 class="title-md">Claim a dish</h3>
+        <p class="muted">Pick a course (appetizer, main, side, dessert, or beverage) so the menu stays balanced.</p>
+        <a class="link" href="/potluck#bring">Bring a dish {{icon "arrow-forward"}}</a>
+      </li>
+      <li class="step">
+        <span class="step-num">2</span>
+        <h3 class="title-md">Flag the oven</h3>
+        <p class="muted">Oven space is the bottleneck. If yours needs to bake or reheat, say so and add the temp and time.</p>
+        <a class="link" href="/potluck#oven">See the oven lineup {{icon "arrow-forward"}}</a>
+      </li>
+      <li class="step">
+        <span class="step-num">3</span>
+        <h3 class="title-md">Talk it out</h3>
+        <p class="muted">Carpools, recipe debates, games, and questions for the host all go in the forum.</p>
+        <a class="link" href="/forum">Open the forum {{icon "arrow-forward"}}</a>
+      </li>
+    </ol>
+  </section>
+
+  <div class="grid-12">
+    <section class="card card-lg span-7">
+      <div class="card-title-row">
+        <h2 class="h-md">Course checklist</h2>
+        <span class="pill pill-sage">{{$m.Covered}} of {{len $m.Courses}} covered</span>
+      </div>
+      <ul class="course-list">
+        {{- range $m.Courses}}
+        <li class="course-row">
+          <span class="icon-bubble sm tone-{{.Tone}}">{{icon .Icon}}</span>
+          <div class="grow">
+            <h3>{{.Plural}}</h3>
+            <p>{{.Blurb}}</p>
+          </div>
+          {{- if .Dishes}}
+          <span class="pill pill-sage">{{icon "check"}}{{len .Dishes}}</span>
+          {{- else}}
+          <a class="pill pill-oven" href="/potluck?add={{.Key}}#bring">Needs someone</a>
+          {{- end}}
+        </li>
+        {{- end}}
+      </ul>
+    </section>
+    <section class="card card-lg span-5 card-tint">
+      <span class="icon-bubble lg tone-amber">{{icon "help"}}</span>
+      <h2 class="h-md">Got a question?</h2>
+      <p class="muted">Allergies, plus-ones, what time to show up, whether to bring a folding chair: ask in the forum so everyone sees the answer.</p>
+      <a class="btn btn-primary" href="/forum#new">{{icon "chat-bubble"}}Ask in the forum</a>
+    </section>
+  </div>
+</div>
+{{end}}

@@ -1,0 +1,29 @@
+{{define "content"}}{{$p := .Page}}
+<div class="gate">
+  <div class="hero-deco" aria-hidden="true">
+    <svg class="deco-leaf" viewBox="0 0 200 200"><path d="M100 0C120 40 180 60 200 100 160 120 140 180 100 200 80 160 20 140 0 100 40 80 60 20 100 0Z"/></svg>
+    <svg class="deco-circle right" viewBox="0 0 200 200"><circle cx="100" cy="100" r="80"/></svg>
+  </div>
+  <div class="card gate-card">
+    <span class="brand-mark lg" aria-hidden="true">🏷️</span>
+    <p class="eyebrow">Name tag</p>
+    <h1 class="h-lg">{{if $p.Name}}Change your name{{else}}What should we call you?{{end}}</h1>
+    <p class="muted">Your name shows up next to your dishes and posts. No account needed; it's saved on this device.</p>
+    <form method="post" action="/name" class="gate-form">
+      <input type="hidden" name="next" value="{{$p.Next}}">
+      <div class="field">
+        <label for="name">Your name</label>
+        <input id="name" name="name" value="{{$p.Name}}" maxlength="40" required autocomplete="name" autofocus placeholder="e.g. Big Mike">
+      </div>
+      {{- with $p.Error}}<p class="form-error" role="alert">{{.}}</p>{{end}}
+      {{- if $p.Name}}
+      <p class="small muted">Heads up: dishes and posts are matched by name, so you'll only be able to edit the ones under your new name.</p>
+      {{- end}}
+      <button class="btn btn-primary btn-lg btn-block" type="submit">{{if $p.Name}}Save name{{else}}Pull up a chair{{end}}{{icon "arrow-forward"}}</button>
+      {{- if $p.Name}}
+      <a class="btn btn-quiet btn-block" href="{{$p.Next}}">Never mind</a>
+      {{- end}}
+    </form>
+  </div>
+</div>
+{{end}}

@@ -1,0 +1,29 @@
+{{define "content"}}{{$p := .Page}}
+<div class="gate">
+  <div class="hero-deco" aria-hidden="true">
+    <svg class="deco-leaf" viewBox="0 0 200 200"><path d="M100 0C120 40 180 60 200 100 160 120 140 180 100 200 80 160 20 140 0 100 40 80 60 20 100 0Z"/></svg>
+    <svg class="deco-circle right" viewBox="0 0 200 200"><circle cx="100" cy="100" r="80"/></svg>
+  </div>
+  <div class="card gate-card">
+    <span class="brand-mark lg" aria-hidden="true">🦃</span>
+    <p class="eyebrow">You're invited</p>
+    <h1 class="h-lg">{{.Event.Name}}</h1>
+    <p class="muted">This feast is friends-only. Enter the password from the group chat to pull up a chair.</p>
+    <form method="post" action="/login" class="gate-form">
+      <input type="hidden" name="next" value="{{$p.Next}}">
+      {{- if $p.NeedName}}
+      <div class="field">
+        <label for="name">Your name</label>
+        <input id="name" name="name" value="{{$p.Name}}" maxlength="40" required autocomplete="name" placeholder="What should we call you?">
+      </div>
+      {{- end}}
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" name="password" required autocomplete="current-password"{{if not $p.NeedName}} autofocus{{end}}>
+      </div>
+      {{- with $p.Error}}<p class="form-error" role="alert">{{.}}</p>{{end}}
+      <button class="btn btn-primary btn-lg btn-block" type="submit">Let me in{{icon "arrow-forward"}}</button>
+    </form>
+  </div>
+</div>
+{{end}}
