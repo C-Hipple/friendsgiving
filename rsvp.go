@@ -69,17 +69,21 @@ func (a *app) setRSVP(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/#rsvp", http.StatusSeeOther)
 }
 
-func (a *app) addGuest(w http.ResponseWriter, r *http.Request) {
-	f := guestForm{
-		Name: strings.Join(strings.Fields(r.FormValue("name")), " "),
-		Kid:  r.FormValue("age") == "kid",
-	}
+// newGuestForm tidies a guest from the web form or an MCP tool, and says
+// what's wrong with it.
+func newGuestForm(name string, kid bool) guestForm {
+	f := guestForm{Name: strings.Join(strings.Fields(name), " "), Kid: kid}
 	switch n := utf8.RuneCountInString(f.Name); {
 	case n == 0:
 		f.Error = "Who are you bringing?"
 	case n > maxNameLen:
 		f.Error = "Keep names under 40 characters."
 	}
+	return f
+}
+
+func (a *app) addGuest(w http.ResponseWriter, r *http.Request) {
+	f := newGuestForm(r.FormValue("name"), r.FormValue("age") == "kid")
 	if f.Error != "" {
 		a.renderHome(w, r, http.StatusUnprocessableEntity, f)
 		return

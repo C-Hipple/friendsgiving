@@ -233,6 +233,86 @@ func TestMCPTools(t *testing.T) {
 	}
 }
 
+func TestMCPRSVP(t *testing.T) {
+	srv, store := newTestServer(t)
+	ctx := context.Background()
+	chris := mcpClient{t: t, url: srv.URL + "/mcp", name: "Chris", pass: "gobble"}
+	mike := mcpClient{t: t, url: srv.URL + "/mcp", name: "Mike", pass: "gobble"}
+
+	type listing struct {
+		Headcount  map[string]int `json:"headcount"`
+		Going      []RSVP         `json:"going"`
+		CantMakeIt []string       `json:"cant_make_it"`
+		YourRSVP   *RSVP          `json:"your_rsvp"`
+	}
+	// call runs a tool that should work and decodes its guest list.
+	call := func(c mcpClient, tool string, args map[string]any) listing {
+		t.Helper()
+		text, isErr := c.call(tool, args)
+		var g listing
+		if err := json.Unmarshal([]byte(text), &g); isErr || err != nil {
+			t.Fatalf("%s: %s", tool, text)
+		}
+		return g
+	}
+
+	if g := call(chris, "list_rsvps", nil); g.YourRSVP != nil || g.Headcount["coming"] != 0 || g.Going == nil || g.CantMakeIt == nil {
+		t.Errorf("before anyone answers: %+v", g)
+	}
+	if text, _ := chris.call("get_event", nil); !strings.Contains(text, `"your_answer": "not yet"`) {
+		t.Errorf("get_event before an RSVP: %s", text)
+	}
+	if text, isErr := chris.call("rsvp", map[string]any{}); !isErr || !strings.Contains(text, "going is true or false") {
+		t.Errorf("rsvp without an answer: %v %s", isErr, text)
+	}
+	if text, isErr := chris.call("add_guest", map[string]any{"name": "  "}); !isErr || !strings.Contains(text, "Who are you bringing?") {
+		t.Errorf("blank guest: %v %s", isErr, text)
+	}
+
+	// Bringing a guest counts you in.
+	g := call(chris, "add_guest", map[string]any{"name": " Emma ", "kid": true})
+	if g.YourRSVP == nil || !g.YourRSVP.Going || len(g.YourRSVP.Guests) != 1 || g.YourRSVP.Guests[0].Name != "Emma" ||
+		g.Headcount["coming"] != 2 || g.Headcount["kids"] != 1 {
+		t.Fatalf("after add_guest: %+v", g)
+	}
+	call(chris, "add_guest", map[string]any{"name": "Jordan"})
+	call(mike, "rsvp", map[string]any{"going": false})
+
+	g = call(mike, "list_rsvps", nil)
+	if g.Headcount["coming"] != 3 || g.Headcount["adults"] != 2 || len(g.Going) != 1 || len(g.Going[0].Guests) != 2 ||
+		strings.Join(g.CantMakeIt, ",") != "Mike" || g.YourRSVP == nil || g.YourRSVP.Going {
+		t.Errorf("list_rsvps: %+v", g)
+	}
+
+	if text, isErr := mike.call("remove_guest", map[string]any{"id": 1}); !isErr || !strings.Contains(text, "Only Chris can take Emma off the list.") {
+		t.Errorf("Mike removed Chris's guest: %v %s", isErr, text)
+	}
+	if _, isErr := chris.call("remove_guest", map[string]any{"id": 99}); !isErr {
+		t.Error("removed a guest who isn't there")
+	}
+
+	// Backing out keeps your party on your RSVP, and saying yes brings it back.
+	if g := call(chris, "rsvp", map[string]any{"going": false}); g.Headcount["coming"] != 0 || g.YourRSVP == nil || g.YourRSVP.Going || len(g.YourRSVP.Guests) != 2 {
+		t.Errorf("after Chris backs out: %+v", g)
+	}
+	if text, _ := chris.call("get_event", nil); !strings.Contains(text, `"your_answer": "can't make it"`) || !strings.Contains(text, `"cant_make_it": 2`) {
+		t.Errorf("get_event after backing out: %s", text)
+	}
+	if g := call(chris, "rsvp", map[string]any{"going": true}); g.Headcount["coming"] != 3 {
+		t.Errorf("after Chris comes back: %+v", g)
+	}
+
+	if text, isErr := chris.call("remove_guest", map[string]any{"id": 1}); isErr || !strings.Contains(text, `"name": "Emma"`) {
+		t.Errorf("remove_guest: %v %s", isErr, text)
+	}
+	if _, err := store.GetGuest(ctx, 1); err != errNotFound {
+		t.Errorf("after remove_guest: err = %v", err)
+	}
+	if text, _ := chris.call("get_event", nil); !strings.Contains(text, `"your_answer": "going"`) || !strings.Contains(text, `"coming": 2`) {
+		t.Errorf("get_event after removing Emma: %s", text)
+	}
+}
+
 func TestMCPDocs(t *testing.T) {
 	srv, _ := newTestServer(t)
 	c := loggedIn(t, srv, "Mike's Claude")

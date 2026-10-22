@@ -163,11 +163,11 @@ func (a *app) mcpHandle(r *http.Request, user string, req rpcRequest) (any, *rpc
 }
 
 func (a *app) mcpInstructions(user string) string {
-	return fmt.Sprintf(`This is the private coordination site for %[1]s, a Thanksgiving potluck among friends: a sign-up sheet for dishes, the event details, and a small forum.
+	return fmt.Sprintf(`This is the private coordination site for %[1]s, a Thanksgiving potluck among friends: RSVPs, a sign-up sheet for dishes, the event details, and a small forum.
 
-You're signed in as %[2]s. Dishes you add and posts you write appear under that name for everyone to see, and you can only change or delete things under it. Write in your user's voice, and check with them before you post or sign them up for anything.
+You're signed in as %[2]s. Your RSVP and guests, the dishes you add, and the posts you write appear under that name for everyone to see, and you can only change or delete things under it. Write in your user's voice, and check with them before you post, RSVP, or sign them up for anything.
 
-Start with get_event for the plan and which courses still need someone. Check list_dishes before adding a dish so nobody doubles up, and set needs_oven for anything that has to bake or reheat at the party: oven space is the bottleneck.`,
+Start with get_event for the plan, the headcount, and which courses still need someone. RSVPing puts %[2]s on the guest list, so only do it if that's your user's own name and not one for you. Check list_dishes before adding a dish so nobody doubles up, and set needs_oven for anything that has to bake or reheat at the party: oven space is the bottleneck.`,
 		a.cfg.Event.Name, user)
 }
 
@@ -251,8 +251,33 @@ var (
 var mcpTools = []mcpTool{
 	{
 		Name: "get_event", Title: "Event details", Annotations: reads, run: (*app).toolGetEvent,
-		Description: "The plan: date, time and place, plus how the potluck is shaping up (dishes per course, how many need the oven) and how busy the forum is. Start here.",
+		Description: "The plan: date, time and place, plus the headcount and whether you've RSVPed, how the potluck is shaping up (dishes per course, how many need the oven) and how busy the forum is. Start here.",
 		InputSchema: object(nil, map[string]any{}),
+	},
+	{
+		Name: "list_rsvps", Title: "Guest list", Annotations: reads, run: (*app).toolListRSVPs,
+		Description: "Who's coming and who they're bringing, who can't make it, the headcount (adults and kids), and your own RSVP, which is null until you answer.",
+		InputSchema: object(nil, map[string]any{}),
+	},
+	{
+		Name: "rsvp", Title: "RSVP", Annotations: changes, run: (*app).toolRSVP,
+		Description: "Say whether you're coming, or change your answer. If you can't make it, your guests drop off the headcount too, and they come back if you say yes again.",
+		InputSchema: object([]string{"going"}, map[string]any{
+			"going": prop("boolean", "true if you're coming, false if you can't make it."),
+		}),
+	},
+	{
+		Name: "add_guest", Title: "Bring a guest", Annotations: adds, run: (*app).toolAddGuest,
+		Description: "Add someone you're bringing to your party, marked adult or kid. This RSVPs you yes too. Check list_rsvps first so nobody's counted twice.",
+		InputSchema: object([]string{"name"}, map[string]any{
+			"name": prop("string", "Their name, up to 40 characters."),
+			"kid":  prop("boolean", "true for a kid. Guests are adults unless you say so."),
+		}),
+	},
+	{
+		Name: "remove_guest", Title: "Remove a guest", Annotations: changes, run: (*app).toolRemoveGuest,
+		Description: "Take someone you added off the guest list.",
+		InputSchema: object([]string{"id"}, withID("The guest's id, from list_rsvps.", map[string]any{})),
 	},
 	{
 		Name: "list_dishes", Title: "List potluck dishes", Annotations: reads, run: (*app).toolListDishes,
@@ -421,6 +446,17 @@ func (a *app) toolGetEvent(ctx context.Context, user string, _ json.RawMessage) 
 	if err != nil {
 		return nil, err
 	}
+	g, err := a.guestList(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	answer := "not yet"
+	if g.Mine != nil {
+		answer = "can't make it"
+		if g.Mine.Going {
+			answer = "going"
+		}
+	}
 	m := buildMenu(dishes)
 	type courseStatus struct {
 		Course string `json:"course"`
@@ -434,6 +470,11 @@ func (a *app) toolGetEvent(ctx context.Context, user string, _ json.RawMessage) 
 	return map[string]any{
 		"signed_in_as": user,
 		"event":        a.cfg.Event,
+		"rsvps": map[string]any{
+			"headcount":    headcount(g),
+			"cant_make_it": len(g.Declined),
+			"your_answer":  answer,
+		},
 		"potluck": map[string]any{
 			"dishes":     m.Total,
 			"cooks":      m.Cooks,
@@ -442,6 +483,101 @@ func (a *app) toolGetEvent(ctx context.Context, user string, _ json.RawMessage) 
 		},
 		"forum": map[string]any{"threads": c.Threads, "replies": c.Replies},
 	}, nil
+}
+
+func (a *app) guestList(ctx context.Context, user string) (guestList, error) {
+	rsvps, err := a.store.ListRSVPs(ctx)
+	if err != nil {
+		return guestList{}, err
+	}
+	return buildGuestList(rsvps, user), nil
+}
+
+// headcount is everyone coming, guests included.
+func headcount(g guestList) map[string]int {
+	return map[string]int{"coming": g.Total, "adults": g.Adults(), "kids": g.Kids}
+}
+
+func (a *app) toolListRSVPs(ctx context.Context, user string, _ json.RawMessage) (any, error) {
+	g, err := a.guestList(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	declined := []string{}
+	for _, r := range g.Declined {
+		declined = append(declined, r.Name)
+	}
+	return map[string]any{
+		"headcount":    headcount(g),
+		"going":        orEmpty(g.Going),
+		"cant_make_it": declined,
+		"your_rsvp":    g.Mine,
+	}, nil
+}
+
+// yourRSVP is what the RSVP tools answer with: the user's party and the
+// headcount it's now part of.
+func (a *app) yourRSVP(ctx context.Context, user string) (any, error) {
+	g, err := a.guestList(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"your_rsvp": g.Mine, "headcount": headcount(g)}, nil
+}
+
+func (a *app) toolRSVP(ctx context.Context, user string, args json.RawMessage) (any, error) {
+	var in struct {
+		Going *bool `json:"going"`
+	}
+	if err := decodeArgs(args, &in); err != nil {
+		return nil, err
+	}
+	if in.Going == nil {
+		return nil, toolErr("Say whether you're coming: going is true or false.")
+	}
+	if err := a.store.SetRSVP(ctx, user, *in.Going); err != nil {
+		return nil, err
+	}
+	return a.yourRSVP(ctx, user)
+}
+
+func (a *app) toolAddGuest(ctx context.Context, user string, args json.RawMessage) (any, error) {
+	var in struct {
+		Name string `json:"name"`
+		Kid  bool   `json:"kid"`
+	}
+	if err := decodeArgs(args, &in); err != nil {
+		return nil, err
+	}
+	f := newGuestForm(in.Name, in.Kid)
+	if f.Error != "" {
+		return nil, toolErr(f.Error)
+	}
+	if _, err := a.store.AddGuest(ctx, user, Guest{Name: f.Name, Kid: f.Kid}); err != nil {
+		return nil, err
+	}
+	return a.yourRSVP(ctx, user)
+}
+
+func (a *app) toolRemoveGuest(ctx context.Context, user string, args json.RawMessage) (any, error) {
+	id, err := argID(args)
+	if err != nil {
+		return nil, err
+	}
+	g, err := a.store.GetGuest(ctx, id)
+	if errors.Is(err, errNotFound) {
+		return nil, toolErr(fmt.Sprintf("There's no guest %d. list_rsvps shows who's on the list.", id))
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !sameName(g.By, user) {
+		return nil, toolErr("Only " + g.By + " can take " + g.Name + " off the list.")
+	}
+	if err := a.store.DeleteGuest(ctx, g.ID); err != nil {
+		return nil, err
+	}
+	return map[string]any{"removed": g}, nil
 }
 
 func (a *app) toolListDishes(ctx context.Context, _ string, args json.RawMessage) (any, error) {
