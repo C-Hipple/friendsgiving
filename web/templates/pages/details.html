@@ -1,4 +1,4 @@
-{{define "content"}}{{$m := .Page}}
+{{define "content"}}{{$p := .Page}}{{$m := $p.Menu}}{{$g := $p.Guests}}
 <section class="page-head">
   <div class="wrap">
     <div class="head-card">
@@ -11,6 +11,7 @@
         <div class="head-chips">
           <div class="mini-stat">{{icon "calendar-month" "ink-pumpkin"}}<div><span class="label-sm muted">Date</span><strong>{{if tbd .Event.Date}}TBD{{else}}{{.Event.Date}}{{end}}</strong></div></div>
           <div class="mini-stat">{{icon "location-on" "ink-cranberry"}}<div><span class="label-sm muted">Location</span><strong>{{if tbd .Event.Location}}TBD{{else}}{{.Event.Location}}{{end}}</strong></div></div>
+          <a class="mini-stat" href="#guests">{{icon "group" "ink-sage"}}<div><span class="label-sm muted">Coming</span><strong>{{$g.Total}} {{plural $g.Total "person" "people"}}</strong></div></a>
         </div>
       </div>
     </div>
@@ -40,6 +41,120 @@
       <p class="note">{{icon "map"}}<span>The address will show up here once we've picked a spot.</span></p>
       {{- end}}
     </article>
+  </div>
+
+  <div class="grid-12">
+    <section class="card card-lg span-5 anchor" id="rsvp">
+      <div class="card-head">
+        <span class="icon-bubble tone-cranberry">{{icon "celebration"}}</span>
+        <div>
+          <h2 class="h-md">Your RSVP</h2>
+          <p class="muted small">Responding as <strong>{{.User}}</strong></p>
+        </div>
+      </div>
+      {{- with $g.Mine}}{{if .Going}}
+      <div class="stack-lg">
+        <div class="rsvp-status going">
+          {{icon "check-circle"}}
+          <div class="grow"><strong>You're in!</strong><span>See you at the table.</span></div>
+          <form method="post" action="/rsvp">
+            <button class="btn btn-quiet" type="submit" name="going" value="no">Can't make it?</button>
+          </form>
+        </div>
+
+        <div class="party">
+          <h3 class="label-sm muted">Your party · {{.Size}}</h3>
+          <ul class="party-list">
+            <li class="party-item">{{template "avatar" .Name}}<span class="grow strong">{{.Name}}</span><span class="muted small">You</span></li>
+            {{- range .Guests}}
+            <li class="party-item">
+              {{template "avatar" .Name}}
+              <span class="grow">{{.Name}}</span>
+              {{- if .Kid}}<span class="pill pill-kid">Kid</span>{{end}}
+              <form method="post" action="/rsvp/guests/{{.ID}}/delete" data-confirm="Take {{.Name}} off the guest list?">
+                <button class="icon-btn danger" type="submit" aria-label="Remove {{.Name}}" title="Remove">{{icon "delete"}}</button>
+              </form>
+            </li>
+            {{- end}}
+          </ul>
+        </div>
+
+        <form class="guest-form" method="post" action="/rsvp/guests">
+          <div class="field">
+            <label for="guest-name">Bringing anyone?</label>
+            <input id="guest-name" name="name" value="{{$p.Form.Name}}" maxlength="40" required autocomplete="off" placeholder="Their name"{{if $p.Form.Error}} autofocus{{end}}>
+            {{- with $p.Form.Error}}<p class="field-error">{{.}}</p>{{end}}
+          </div>
+          <div class="guest-form-row">
+            <fieldset class="choices">
+              <legend class="sr-only">Adult or kid</legend>
+              <label class="choice choice-tag"><input type="radio" name="age" value="adult"{{if not $p.Form.Kid}} checked{{end}}><span>Adult</span></label>
+              <label class="choice choice-tag"><input type="radio" name="age" value="kid"{{if $p.Form.Kid}} checked{{end}}><span>Kid</span></label>
+            </fieldset>
+            <button class="btn btn-white" type="submit">{{icon "add" "ink-pumpkin"}}Add to party</button>
+          </div>
+        </form>
+      </div>
+      {{- else}}
+      <div class="rsvp-status">
+        {{icon "no-food"}}
+        <div class="grow"><strong>You can't make it</strong><span>We'll miss you. Plans change, though.</span></div>
+        <form method="post" action="/rsvp">
+          <button class="btn btn-primary" type="submit" name="going" value="yes">{{icon "check"}}I'm in after all</button>
+        </form>
+      </div>
+      {{- end}}{{else}}
+      <div class="stack">
+        <p class="title-md">Are you coming?</p>
+        <p class="muted">Let the host know, then add anyone you're bringing along, kids included.</p>
+        <form class="btn-row" method="post" action="/rsvp">
+          <button class="btn btn-primary" type="submit" name="going" value="yes">{{icon "check"}}I'm in!</button>
+          <button class="btn btn-white" type="submit" name="going" value="no">Can't make it</button>
+        </form>
+      </div>
+      {{- end}}
+    </section>
+
+    <section class="card card-lg span-7 anchor" id="guests">
+      <div class="card-title-row">
+        <div>
+          <p class="eyebrow">Guest list</p>
+          <h2 class="h-md">Who's coming</h2>
+          {{- if $g.Kids}}
+          <p class="muted small">{{$g.Adults}} {{plural $g.Adults "adult" "adults"}} · {{$g.Kids}} {{plural $g.Kids "kid" "kids"}}</p>
+          {{- end}}
+        </div>
+        <span class="pill pill-sage">{{icon "group"}}{{$g.Total}} coming</span>
+      </div>
+      {{- with $g.Going}}
+      <ul class="guest-list">
+        {{- range .}}
+        <li class="guest-party{{if same .Name $.User}} mine{{end}}">
+          {{template "avatar" .Name}}
+          <div class="grow">
+            <strong>{{.Name}}</strong>
+            {{- with .Guests}}
+            <ul class="guest-chips">
+              {{- range .}}
+              <li>{{.Name}}{{if .Kid}}<span class="kid">Kid</span>{{end}}</li>
+              {{- end}}
+            </ul>
+            {{- end}}
+          </div>
+          <span class="party-size" title="Party of {{.Size}}">{{.Size}}</span>
+        </li>
+        {{- end}}
+      </ul>
+      {{- else}}
+      <div class="empty">
+        <span class="emoji" aria-hidden="true">🪑</span>
+        <p>No RSVPs yet. Be the first to pull up a chair.</p>
+      </div>
+      {{- end}}
+      {{- with $g.Declined}}
+      <p class="declined">{{icon "no-food"}}<span><strong>Can't make it:</strong> {{range $i, $r := .}}{{if $i}}, {{end}}{{$r.Name}}{{end}}</span></p>
+      {{- end}}
+    </section>
   </div>
 
   <section class="card card-lg">
@@ -97,7 +212,7 @@
     <section class="card card-lg span-5 card-tint">
       <span class="icon-bubble lg tone-amber">{{icon "help"}}</span>
       <h2 class="h-md">Got a question?</h2>
-      <p class="muted">Allergies, plus-ones, what time to show up, whether to bring a folding chair: ask in the forum so everyone sees the answer.</p>
+      <p class="muted">Allergies, what time to show up, whether to bring a folding chair: ask in the forum so everyone sees the answer.</p>
       <a class="btn btn-primary" href="/forum#new">{{icon "chat-bubble"}}Ask in the forum</a>
     </section>
   </div>

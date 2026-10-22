@@ -8,6 +8,9 @@ A small, private coordination site for Thanksgiving: a potluck sign-up board
   notes and dietary tags. The oven lineup lists everything that needs oven time.
 - **Event details**: date, time, and location, configured by environment
   variables. All three default to TBD.
+- **RSVPs**: say you're in (or can't make it) and add the people you're
+  bringing, marking kids. The details page lists everyone coming with an
+  adult/kid headcount.
 - **Forum**: threads and replies.
 - **No accounts**: friends enter the shared password and a name. The name lives
   in a cookie, and people can edit or delete only the dishes and posts under

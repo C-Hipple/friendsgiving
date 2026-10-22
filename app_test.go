@@ -172,3 +172,69 @@ func TestForumReplies(t *testing.T) {
 		t.Fatalf("replies survived thread delete: %d", len(replies))
 	}
 }
+
+func TestRSVP(t *testing.T) {
+	srv, store := newTestServer(t)
+	chris := loggedIn(t, srv, "Chris")
+	mike := loggedIn(t, srv, "Mike")
+	ctx := context.Background()
+
+	_, body := get(t, chris, srv.URL+"/details")
+	if !strings.Contains(body, "Are you coming?") || !strings.Contains(body, "No RSVPs yet") {
+		t.Fatal("details page doesn't ask for an RSVP before anyone answers")
+	}
+
+	post(t, chris, srv.URL+"/rsvp", url.Values{"going": {"yes"}})
+	if resp := post(t, chris, srv.URL+"/rsvp/guests", url.Values{"name": {"  "}}); resp.StatusCode != http.StatusUnprocessableEntity {
+		t.Fatalf("blank guest: got %d, want 422", resp.StatusCode)
+	}
+	post(t, chris, srv.URL+"/rsvp/guests", url.Values{"name": {"Emma"}, "age": {"kid"}})
+	post(t, chris, srv.URL+"/rsvp/guests", url.Values{"name": {"<b>Jordan</b>"}, "age": {"adult"}})
+	post(t, mike, srv.URL+"/rsvp", url.Values{"going": {"no"}})
+
+	// Bringing a guest counts you in, even without answering first.
+	dave := loggedIn(t, srv, "Dave")
+	post(t, dave, srv.URL+"/rsvp/guests", url.Values{"name": {"Sam"}})
+
+	g := buildGuestList(mustRSVPs(t, store), "Chris")
+	if g.Total != 5 || g.Kids != 1 || len(g.Going) != 2 || len(g.Declined) != 1 || g.Mine == nil || g.Mine.Size() != 3 {
+		t.Fatalf("guest list = %+v", g)
+	}
+
+	_, body = get(t, mike, srv.URL+"/details")
+	for _, want := range []string{"Emma", "&lt;b&gt;Jordan&lt;/b&gt;", "Sam", "5 coming", "4 adults · 1 kid", "Can't make it:</strong> Mike"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("details page is missing %q", want)
+		}
+	}
+
+	// Same person under a differently cased name: one RSVP, not two.
+	post(t, loggedIn(t, srv, "chris"), srv.URL+"/rsvp", url.Values{"going": {"no"}})
+	g = buildGuestList(mustRSVPs(t, store), "Chris")
+	if len(g.Declined) != 2 || g.Total != 2 || g.Mine == nil || g.Mine.Going {
+		t.Fatalf("after Chris backs out: %+v", g)
+	}
+	post(t, chris, srv.URL+"/rsvp", url.Values{"going": {"yes"}})
+	if g := buildGuestList(mustRSVPs(t, store), "Chris"); g.Total != 5 {
+		t.Fatalf("Chris's party didn't come back with them: total %d, want 5", g.Total)
+	}
+
+	// Only the person who added a guest can remove them.
+	post(t, mike, srv.URL+"/rsvp/guests/1/delete", nil)
+	if _, err := store.GetGuest(ctx, 1); err != nil {
+		t.Fatalf("another user removed a guest: %v", err)
+	}
+	post(t, chris, srv.URL+"/rsvp/guests/1/delete", nil)
+	if _, err := store.GetGuest(ctx, 1); err != errNotFound {
+		t.Fatalf("after delete: err = %v", err)
+	}
+}
+
+func mustRSVPs(t *testing.T, store *Store) []RSVP {
+	t.Helper()
+	rsvps, err := store.ListRSVPs(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rsvps
+}

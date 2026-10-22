@@ -46,6 +46,23 @@ CREATE TABLE IF NOT EXISTS replies (
 	created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS replies_by_thread ON replies (thread_id, created_at);
+
+CREATE TABLE IF NOT EXISTS rsvps (
+	id         INTEGER PRIMARY KEY,
+	name       TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+	going      INTEGER NOT NULL,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS guests (
+	id         INTEGER PRIMARY KEY,
+	rsvp_id    INTEGER NOT NULL REFERENCES rsvps (id) ON DELETE CASCADE,
+	name       TEXT    NOT NULL,
+	kid        INTEGER NOT NULL DEFAULT 0,
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS guests_by_rsvp ON guests (rsvp_id, created_at);
 `
 
 type Store struct {
@@ -283,6 +300,116 @@ func (s *Store) DeleteReply(ctx context.Context, r Reply) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+// RSVP is one person's answer, plus anyone they're bringing. Like dishes and
+// posts, it belongs to whoever holds the name.
+type RSVP struct {
+	ID     int64
+	Name   string
+	Going  bool
+	Guests []Guest
+}
+
+// Size counts the person who RSVPed and their guests.
+func (r RSVP) Size() int { return 1 + len(r.Guests) }
+
+type Guest struct {
+	ID   int64
+	Name string
+	Kid  bool
+	By   string // who added them
+}
+
+func (s *Store) ListRSVPs(ctx context.Context) ([]RSVP, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, name, going FROM rsvps ORDER BY name COLLATE NOCASE, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []RSVP
+	index := map[int64]int{}
+	for rows.Next() {
+		var r RSVP
+		if err := rows.Scan(&r.ID, &r.Name, &r.Going); err != nil {
+			return nil, err
+		}
+		index[r.ID] = len(out)
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	rows, err = s.db.QueryContext(ctx, `SELECT id, rsvp_id, name, kid FROM guests ORDER BY created_at, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var g Guest
+		var rsvpID int64
+		if err := rows.Scan(&g.ID, &rsvpID, &g.Name, &g.Kid); err != nil {
+			return nil, err
+		}
+		if i, ok := index[rsvpID]; ok {
+			g.By = out[i].Name
+			out[i].Guests = append(out[i].Guests, g)
+		}
+	}
+	return out, rows.Err()
+}
+
+const upsertRSVP = `
+	INSERT INTO rsvps (name, going, created_at, updated_at) VALUES (?, ?, ?, ?)
+	ON CONFLICT (name) DO UPDATE SET name = excluded.name, going = excluded.going, updated_at = excluded.updated_at
+	RETURNING id`
+
+func (s *Store) SetRSVP(ctx context.Context, name string, going bool) error {
+	now := time.Now().Unix()
+	var id int64
+	return s.db.QueryRowContext(ctx, upsertRSVP, name, going, now, now).Scan(&id)
+}
+
+// AddGuest adds someone to name's party. Bringing a guest means you're
+// coming too, so it also marks name as going.
+func (s *Store) AddGuest(ctx context.Context, name string, g Guest) (int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	now := time.Now().Unix()
+	var rsvpID int64
+	if err := tx.QueryRowContext(ctx, upsertRSVP, name, true, now, now).Scan(&rsvpID); err != nil {
+		return 0, err
+	}
+	res, err := tx.ExecContext(ctx,
+		`INSERT INTO guests (rsvp_id, name, kid, created_at) VALUES (?, ?, ?, ?)`, rsvpID, g.Name, g.Kid, now)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return id, tx.Commit()
+}
+
+func (s *Store) GetGuest(ctx context.Context, id int64) (Guest, error) {
+	var g Guest
+	err := s.db.QueryRowContext(ctx,
+		`SELECT g.id, g.name, g.kid, r.name FROM guests g JOIN rsvps r ON r.id = g.rsvp_id WHERE g.id = ?`, id).
+		Scan(&g.ID, &g.Name, &g.Kid, &g.By)
+	if errors.Is(err, sql.ErrNoRows) {
+		return g, errNotFound
+	}
+	return g, err
+}
+
+func (s *Store) DeleteGuest(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM guests WHERE id = ?`, id)
+	return err
 }
 
 // Person is anyone who has signed up for a dish or posted in the forum.
