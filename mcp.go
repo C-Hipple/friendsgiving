@@ -67,6 +67,7 @@ func (a *app) mcp(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := a.mcpUser(r)
 	if err != nil {
+		a.logPost(r, PostLog{Path: "/mcp", Status: http.StatusUnauthorized, Form: url.Values{"name": {user}}})
 		w.Header().Set("WWW-Authenticate", `Basic realm="brogiving", charset="UTF-8"`)
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -83,24 +84,26 @@ func (a *app) mcp(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
-	result, rpcErr := a.mcpHandle(r.Context(), user, req)
+	result, rpcErr := a.mcpHandle(r, user, req)
 	writeRPC(w, rpcResponse{ID: req.ID, Result: result, Error: rpcErr})
 }
 
-// mcpUser checks a request's credentials and returns the name it acts as.
+// mcpUser checks a request's credentials and returns the name it acts as,
+// or tried to.
 func (a *app) mcpUser(r *http.Request) (string, error) {
 	name, password, ok := r.BasicAuth()
 	if !ok {
 		q := r.URL.Query()
 		name, password = q.Get("name"), q.Get("password")
 	}
+	name = cleanName(name)
 	if !a.passwordOK(password) {
 		if password != "" {
 			time.Sleep(500 * time.Millisecond) // the login form's speed bump
 		}
-		return "", errors.New("Wrong or missing password. Use HTTP Basic auth, with your name as the username and the site password as the password, or add ?name=...&password=... to the URL.")
+		return name, errors.New("Wrong or missing password. Use HTTP Basic auth, with your name as the username and the site password as the password, or add ?name=...&password=... to the URL.")
 	}
-	if name = cleanName(name); name == "" {
+	if name == "" {
 		return "", errors.New("Pick a name to post as: it goes in the username, or in ?name=...")
 	}
 	return name, nil
@@ -114,7 +117,7 @@ func writeRPC(w http.ResponseWriter, resp rpcResponse) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (a *app) mcpHandle(ctx context.Context, user string, req rpcRequest) (any, *rpcError) {
+func (a *app) mcpHandle(r *http.Request, user string, req rpcRequest) (any, *rpcError) {
 	switch req.Method {
 	case "initialize":
 		var p struct {
@@ -147,8 +150,14 @@ func (a *app) mcpHandle(ctx context.Context, user string, req rpcRequest) (any, 
 		if i < 0 {
 			return nil, &rpcError{-32602, "Unknown tool: " + p.Name}
 		}
-		log.Printf("mcp: %s called %s", user, p.Name)
-		return a.callTool(ctx, &mcpTools[i], user, p.Arguments), nil
+		t := &mcpTools[i]
+		log.Printf("mcp: %s called %s", user, t.Name)
+		result, status := a.callTool(r.Context(), t, user, p.Arguments)
+		if !t.Annotations.ReadOnly {
+			// Like the site's forms; reads are GETs there, and go unlogged.
+			a.logPost(r, PostLog{Path: "/mcp/" + t.Name, Status: status, User: user, Form: argsForm(p.Arguments)})
+		}
+		return result, nil
 	}
 	return nil, &rpcError{-32601, "Method not found: " + req.Method}
 }
@@ -167,24 +176,46 @@ type toolErr string
 
 func (e toolErr) Error() string { return string(e) }
 
-func (a *app) callTool(ctx context.Context, t *mcpTool, user string, args json.RawMessage) map[string]any {
+// callTool runs t, returning its result and, for the post log, the HTTP
+// status a web form would have got: 422 when the caller made a mistake.
+func (a *app) callTool(ctx context.Context, t *mcpTool, user string, args json.RawMessage) (map[string]any, int) {
 	out, err := t.run(a, ctx, user, args)
 	var text bytes.Buffer
 	if err == nil {
 		enc := json.NewEncoder(&text)
-		enc.SetEscapeHTML(false) // "Sides & Trimmings", not "Sides & Trimmings"
+		enc.SetEscapeHTML(false) // leave & and < be: this is for a model, not a page
 		enc.SetIndent("", "  ")
 		err = enc.Encode(out)
 	}
 	var msg toolErr
 	switch {
 	case errors.As(err, &msg):
-		return toolResult(string(msg), true)
+		return toolResult(string(msg), true), http.StatusUnprocessableEntity
 	case err != nil:
 		log.Printf("error: mcp %s: %v", t.Name, err)
-		return toolResult("Something burned in the kitchen. Try again in a moment.", true)
+		return toolResult("Something burned in the kitchen. Try again in a moment.", true), http.StatusInternalServerError
 	}
-	return toolResult(strings.TrimSpace(text.String()), false)
+	return toolResult(strings.TrimSpace(text.String()), false), http.StatusOK
+}
+
+// argsForm flattens tool arguments into form fields for the post log.
+func argsForm(args json.RawMessage) url.Values {
+	form := url.Values{}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(args, &fields); err != nil {
+		if len(args) > 0 {
+			form.Set("arguments", string(args))
+		}
+		return form
+	}
+	for k, v := range fields {
+		var s string
+		if json.Unmarshal(v, &s) != nil {
+			s = string(v) // numbers, booleans, lists
+		}
+		form.Set(k, s)
+	}
+	return form
 }
 
 func toolResult(text string, isError bool) map[string]any {

@@ -255,3 +255,40 @@ func TestMCPDocs(t *testing.T) {
 		}
 	}
 }
+
+func TestMCPPostLog(t *testing.T) {
+	srv, store := newTestServer(t)
+	ctx := context.Background()
+	chris := mcpClient{t: t, url: srv.URL + "/mcp?name=Chris&password=gobble"}
+	mike := mcpClient{t: t, url: srv.URL + "/mcp", name: "Mike", pass: "gobble"}
+
+	mallory := mcpClient{t: t, url: srv.URL + "/mcp", name: "Mallory", pass: "turkey?"}
+	mallory.post(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "initialize"}).Body.Close()
+	chris.rpc("initialize", map[string]any{})
+	chris.call("add_dish", map[string]any{"name": "Pie", "course": "dessert", "needs_oven": true, "dietary_tags": []string{"nuts"}})
+	chris.call("list_dishes", nil) // reads go unlogged, as GETs do on the site
+	mike.call("remove_dish", map[string]any{"id": 1})
+
+	all, total, err := store.PostLogs(ctx, LogFilter{}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 3 {
+		t.Fatalf("got %d entries, want 3: %+v", total, all)
+	}
+	if e := all[2]; e.Path != "/mcp" || e.Status != http.StatusUnauthorized || e.User != "" || e.Form.Get("name") != "Mallory" {
+		t.Errorf("failed sign-in entry = %+v", e)
+	}
+	if e := all[1]; e.Path != "/mcp/add_dish" || e.Status != http.StatusOK || e.User != "Chris" || e.IP != "127.0.0.1" ||
+		e.Form.Get("name") != "Pie" || e.Form.Get("needs_oven") != "true" || e.Form.Get("dietary_tags") != `["nuts"]` {
+		t.Errorf("add_dish entry = %+v", e)
+	}
+	if e := all[0]; e.Path != "/mcp/remove_dish" || e.Status != http.StatusUnprocessableEntity || e.User != "Mike" || e.Form.Get("id") != "1" {
+		t.Errorf("refused remove_dish entry = %+v", e)
+	}
+	for _, pw := range []string{"gobble", "turkey?"} {
+		if _, n, _ := store.PostLogs(ctx, LogFilter{Text: pw}, 1); n != 0 {
+			t.Errorf("post log holds the password %q", pw)
+		}
+	}
+}

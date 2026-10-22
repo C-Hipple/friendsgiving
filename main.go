@@ -25,6 +25,7 @@ type config struct {
 	Addr     string
 	DBPath   string
 	Password string
+	OnFly    bool // behind Fly's proxy, which reports client addresses in Fly-Client-IP
 	Event    eventInfo
 }
 
@@ -48,6 +49,7 @@ func loadConfig() (config, error) {
 		Addr:     env("ADDR", ":8080"),
 		DBPath:   env("DB_PATH", "brogiving.db"),
 		Password: os.Getenv("SITE_PASSWORD"),
+		OnFly:    os.Getenv("FLY_APP_NAME") != "",
 		Event: eventInfo{
 			Name:     env("EVENT_NAME", "Brogiving 2026"),
 			Date:     env("EVENT_DATE", "TBD"),
@@ -155,6 +157,8 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("POST /forum/{id}/replies", a.createReply)
 	mux.HandleFunc("POST /forum/{id}/replies/{rid}/delete", a.deleteReply)
 
+	mux.HandleFunc("GET /logs", a.logs) // unlisted
+
 	// Any method: /mcp skips the cookie gate, so a stray DELETE mustn't fall
 	// through to the not-found page and its event details.
 	mux.HandleFunc("/mcp", a.mcp)
@@ -162,7 +166,7 @@ func (a *app) routes() http.Handler {
 
 	mux.HandleFunc("/", a.notFound)
 
-	return logRequests(secureHeaders(a.requireAuth(mux)))
+	return logRequests(secureHeaders(a.auditPosts(a.requireAuth(mux))))
 }
 
 func secureHeaders(next http.Handler) http.Handler {
