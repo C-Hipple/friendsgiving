@@ -314,6 +314,23 @@ type RSVP struct {
 // Size counts the person who RSVPed and their guests.
 func (r RSVP) Size() int { return 1 + len(r.Guests) }
 
+// Kids and Adults count the whole party; whoever RSVPed is an adult.
+func (r RSVP) Kids() int   { return len(r.KidGuests()) }
+func (r RSVP) Adults() int { return r.Size() - r.Kids() }
+
+func (r RSVP) KidGuests() []Guest   { return r.guests(true) }
+func (r RSVP) AdultGuests() []Guest { return r.guests(false) }
+
+func (r RSVP) guests(kids bool) []Guest {
+	var out []Guest
+	for _, g := range r.Guests {
+		if g.Kid == kids {
+			out = append(out, g)
+		}
+	}
+	return out
+}
+
 type Guest struct {
 	ID   int64
 	Name string
@@ -446,6 +463,7 @@ func (s *Store) People(ctx context.Context) ([]Person, error) {
 type Counts struct {
 	Dishes    int
 	Oven      int
+	Coming    int // everyone RSVPed yes, guests included
 	Threads   int
 	Replies   int
 	LastPost  time.Time
@@ -459,10 +477,12 @@ func (s *Store) Counts(ctx context.Context) (Counts, error) {
 		SELECT
 			(SELECT COUNT(*) FROM dishes),
 			(SELECT COUNT(*) FROM dishes WHERE needs_oven),
+			(SELECT COUNT(*) FROM rsvps WHERE going) +
+				(SELECT COUNT(*) FROM guests JOIN rsvps ON rsvps.id = guests.rsvp_id WHERE going),
 			(SELECT COUNT(*) FROM threads),
 			(SELECT COUNT(*) FROM replies),
 			(SELECT MAX(last_activity_at) FROM threads)`).
-		Scan(&c.Dishes, &c.Oven, &c.Threads, &c.Replies, &last)
+		Scan(&c.Dishes, &c.Oven, &c.Coming, &c.Threads, &c.Replies, &last)
 	if last.Valid {
 		c.LastPost, c.HasPosted = time.Unix(last.Int64, 0), true
 	}

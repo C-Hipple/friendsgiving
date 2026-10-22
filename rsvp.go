@@ -46,35 +46,6 @@ type guestForm struct {
 	Error string
 }
 
-type detailsPage struct {
-	Menu   menu
-	Guests guestList
-	Form   guestForm
-}
-
-func (a *app) details(w http.ResponseWriter, r *http.Request) {
-	a.renderDetails(w, r, http.StatusOK, guestForm{})
-}
-
-func (a *app) renderDetails(w http.ResponseWriter, r *http.Request, status int, form guestForm) {
-	ctx := r.Context()
-	dishes, err := a.store.ListDishes(ctx)
-	if err != nil {
-		a.serverError(w, r, err)
-		return
-	}
-	rsvps, err := a.store.ListRSVPs(ctx)
-	if err != nil {
-		a.serverError(w, r, err)
-		return
-	}
-	a.render(w, r, status, "details", view{Title: "Event Details", Nav: "details", Page: detailsPage{
-		Menu:   buildMenu(dishes),
-		Guests: buildGuestList(rsvps, userName(r)),
-		Form:   form,
-	}})
-}
-
 func (a *app) setRSVP(w http.ResponseWriter, r *http.Request) {
 	var going bool
 	switch r.FormValue("going") {
@@ -82,7 +53,7 @@ func (a *app) setRSVP(w http.ResponseWriter, r *http.Request) {
 		going = true
 	case "no":
 	default:
-		http.Redirect(w, r, "/details#rsvp", http.StatusSeeOther)
+		http.Redirect(w, r, "/#rsvp", http.StatusSeeOther)
 		return
 	}
 	name := userName(r)
@@ -95,7 +66,7 @@ func (a *app) setRSVP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		setFlash(w, r, "Sorry you can't make it, "+name+". We'll miss you!")
 	}
-	http.Redirect(w, r, "/details#rsvp", http.StatusSeeOther)
+	http.Redirect(w, r, "/#rsvp", http.StatusSeeOther)
 }
 
 func (a *app) addGuest(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +81,7 @@ func (a *app) addGuest(w http.ResponseWriter, r *http.Request) {
 		f.Error = "Keep names under 40 characters."
 	}
 	if f.Error != "" {
-		a.renderDetails(w, r, http.StatusUnprocessableEntity, f)
+		a.renderHome(w, r, http.StatusUnprocessableEntity, f)
 		return
 	}
 	if _, err := a.store.AddGuest(r.Context(), userName(r), Guest{Name: f.Name, Kid: f.Kid}); err != nil {
@@ -118,7 +89,7 @@ func (a *app) addGuest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setFlash(w, r, f.Name+" is on the guest list!")
-	http.Redirect(w, r, "/details#rsvp", http.StatusSeeOther)
+	http.Redirect(w, r, "/#rsvp", http.StatusSeeOther)
 }
 
 func (a *app) deleteGuest(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +109,7 @@ func (a *app) deleteGuest(w http.ResponseWriter, r *http.Request) {
 	}
 	if !sameName(g.By, userName(r)) {
 		setFlash(w, r, "Only "+g.By+" can take "+g.Name+" off the list.")
-		http.Redirect(w, r, "/details#guests", http.StatusSeeOther)
+		http.Redirect(w, r, "/#guests", http.StatusSeeOther)
 		return
 	}
 	if err := a.store.DeleteGuest(r.Context(), g.ID); err != nil {
@@ -146,5 +117,5 @@ func (a *app) deleteGuest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setFlash(w, r, g.Name+" is off the guest list.")
-	http.Redirect(w, r, "/details#rsvp", http.StatusSeeOther)
+	http.Redirect(w, r, "/#rsvp", http.StatusSeeOther)
 }

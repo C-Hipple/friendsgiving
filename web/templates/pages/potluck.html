@@ -16,8 +16,8 @@
       <div class="stat-strip">
         <div class="stat-item"><span class="icon-bubble tone-pumpkin">{{icon "dinner-dining"}}</span><div><strong>{{$m.Total}} {{plural $m.Total "dish" "dishes"}}</strong><span>Pledged by {{$m.Cooks}} {{plural $m.Cooks "friend" "friends"}}</span></div></div>
         <div class="stat-item"><span class="icon-bubble tone-cranberry">{{icon "local-fire-department"}}</span><div><strong>{{len $m.Oven}} need the oven</strong><span>{{$m.Total}} total on the menu</span></div></div>
-        <div class="stat-item"><span class="icon-bubble tone-sage">{{icon "check-circle"}}</span><div><strong>{{$m.Covered}} of {{len $m.Courses}} courses</strong><span>{{if $m.Missing}}Still need {{courses $m.Missing}}{{else}}Everything's covered{{end}}</span></div></div>
-        <div class="stat-item"><span class="icon-bubble tone-amber">{{icon "person"}}</span><div><strong>{{$p.Mine}} from you</strong><span>{{if $p.Mine}}Thank you, {{.User}}!{{else}}Nothing yet{{end}}</span></div></div>
+        <div class="stat-item"><span class="icon-bubble tone-sage">{{icon "eco"}}</span><div><strong>{{$m.Friendly}} dietary-friendly</strong><span>Vegetarian, vegan, or gluten-free</span></div></div>
+        <div class="stat-item"><span class="icon-bubble tone-amber">{{icon "help"}}</span><div><strong>{{if $m.Missing}}{{len $m.Missing}} {{plural (len $m.Missing) "course" "courses"}} open{{else}}All courses covered{{end}}</strong><span>{{if $m.Missing}}Still need {{courses $m.Missing}}{{else}}Room for one more pie{{end}}</span></div></div>
       </div>
     </div>
   </div>
@@ -27,35 +27,36 @@
   <div class="grid-12">
     <section class="card card-lg span-7 anchor" id="bring">
       <div class="card-head">
-        <span class="icon-bubble">{{icon "add"}}</span>
+        <span class="icon-bubble solid">{{icon "add"}}</span>
         <div>
           <h2 class="h-md">Bring a dish</h2>
-          <p class="muted small">Signing up as <strong>{{.User}}</strong></p>
+          <p class="muted small">Signing up as <strong>{{.User}}</strong>{{if $p.Mine}} · {{$p.Mine}} {{plural $p.Mine "dish" "dishes"}} from you so far{{end}}</p>
         </div>
       </div>
       {{template "dishForm" (dict "Form" $p.Form "Action" "/potluck" "Submit" "Add to the menu" "Icon" "add" "Cancel" "")}}
     </section>
 
-    <aside class="card card-lg span-5 anchor" id="oven">
-      <div class="card-head">
-        <span class="icon-bubble tone-pumpkin">{{icon "local-fire-department"}}</span>
-        <div class="grow">
-          <h2 class="h-md">Oven lineup</h2>
-          <p class="muted small">Everything that needs a turn in the oven</p>
-        </div>
-        <span class="pill pill-oven">{{len $m.Oven}} {{plural (len $m.Oven) "dish" "dishes"}}</span>
-      </div>
-      <p class="callout">{{icon "info"}}<span>Oven space is limited. Add a temperature and time to your dish so we can plan the bake schedule.</span></p>
-      {{- with $m.Oven}}
-      <ul class="oven-list">
-        {{- range .}}{{$c := category .Category}}
-        <li class="oven-item">
-          <span class="dot tone-{{$c.Tone}}" title="{{$c.Label}}"></span>
-          <div class="grow">
-            <a class="strong" href="#dish-{{.ID}}">{{.Name}}</a>
-            <span class="muted small">{{.BroughtBy}} · {{$c.Label}}</span>
+    <section class="card card-lg span-5 anchor" id="oven">
+      <div class="card-title-row">
+        <div class="card-head flush">
+          <span class="icon-bubble solid">{{icon "local-fire-department"}}</span>
+          <div>
+            <h2 class="h-sm">Oven lineup</h2>
+            <p class="muted small">Everything that needs a turn in the oven</p>
           </div>
-          <span class="temp{{if not .OvenNotes}} faint{{end}}">{{with .OvenNotes}}{{.}}{{else}}No details yet{{end}}</span>
+        </div>
+        <span class="pill pill-pumpkin pill-lg">{{icon "local-fire-department"}}{{len $m.Oven}} {{plural (len $m.Oven) "dish" "dishes"}}</span>
+      </div>
+      <p class="callout">{{icon "info"}}<span><strong>Oven space is limited.</strong> Add a temperature and time to your dish so we can plan the bake schedule.</span></p>
+      {{- with $m.Oven}}
+      <ul class="oven-grid">
+        {{- range .}}{{$c := category .Category}}
+        <li>
+          <a class="oven-tile" href="#dish-{{.ID}}">
+            <span class="oven-tile-label"><span class="dot tone-{{$c.Tone}}"></span>{{$c.Label}} · {{.BroughtBy}}</span>
+            <strong>{{.Name}}</strong>
+            <span class="temp{{if not .OvenNotes}} faint{{end}}">{{with .OvenNotes}}{{.}}{{else}}No details yet{{end}}</span>
+          </a>
         </li>
         {{- end}}
       </ul>
@@ -65,7 +66,7 @@
         <p>Nobody needs the oven yet. Lucky turkey.</p>
       </div>
       {{- end}}
-    </aside>
+    </section>
   </div>
 
   <div class="filter-bar anchor" id="menu">
@@ -93,9 +94,10 @@
       {{- end}}
       {{- if not $p.OvenOnly}}
       <a class="claim-card" href="/potluck?add={{.Key}}#bring">
-        <span class="icon-bubble tone-amber">{{icon "add"}}</span>
-        <span>{{if .Dishes}}Got another {{lower .Label}} in mind?{{else}}No {{lower .Plural}} yet{{end}}</span>
-        <strong>Claim {{if .Dishes}}another{{else}}one{{end}}</strong>
+        <span class="pill pill-pumpkin">{{icon "add"}}Open slot</span>
+        <span class="claim-title">{{if .Dishes}}Got another {{lower .Label}} in mind?{{else}}No {{lower .Plural}} yet{{end}}</span>
+        <span class="claim-blurb">{{.Blurb}}</span>
+        <span class="claim-foot"><em>{{if .Dishes}}There's always room for more{{else}}No one signed up yet{{end}}</em><span class="claim-btn">Claim {{if .Dishes}}another{{else}}one{{end}}</span></span>
       </a>
       {{- else if not .Dishes}}
       <p class="empty-line">No {{lower .Plural}} need the oven.</p>

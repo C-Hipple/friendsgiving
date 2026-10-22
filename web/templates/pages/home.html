@@ -1,4 +1,4 @@
-{{define "content"}}{{$m := .Page.Menu}}{{$g := .Page.Guests}}
+{{define "content"}}{{$p := .Page}}{{$m := $p.Menu}}{{$g := $p.Guests}}
 <section class="hero hero-cranberry">
   <div class="hero-deco" aria-hidden="true">
     <svg class="deco-leaf" viewBox="0 0 200 200"><path d="M100 0C120 40 180 60 200 100 160 120 140 180 100 200 80 160 20 140 0 100 40 80 60 20 100 0Z"/></svg>
@@ -10,8 +10,8 @@
       <h1 class="display">{{.Event.Name}}</h1>
       <p class="lead">Bring your appetite, your signature dish, and your stretchiest pants. Claim what you're cooking, call dibs on oven time, and talk trash in the forum.</p>
       <div class="btn-row">
-        <a class="btn btn-primary btn-lg" href="/potluck#bring">{{icon "add"}}Bring a dish</a>
-        <a class="btn btn-glass btn-lg" href="/details">{{icon "schedule"}}Event details</a>
+        <a class="btn btn-primary btn-lg" href="#rsvp">{{icon "check-circle"}}{{if $g.Mine}}Update my RSVP{{else}}RSVP now{{end}}</a>
+        <a class="btn btn-glass btn-lg" href="/potluck#bring">{{icon "add"}}Bring a dish</a>
       </div>
     </div>
 
@@ -20,9 +20,11 @@
         <span class="icon-bubble">{{icon "calendar-month"}}</span>
         <div class="grow">
           <p class="label-sm muted">Date &amp; time</p>
-          <p class="title-md">{{template "date" .Event}}</p>
+          <p class="title-md">{{template "date" .Event}}{{if not (tbd .Event.Time)}} • {{.Event.Time}}{{end}}</p>
         </div>
-        <span class="pill pill-cranberry">{{if tbd .Event.Time}}Time TBD{{else}}{{.Event.Time}}{{end}}</span>
+        {{- if tbd .Event.Time}}
+        <span class="pill pill-cranberry">Time TBD</span>
+        {{- end}}
       </div>
       <div class="hero-card-body">
         <div class="info-row">
@@ -32,20 +34,14 @@
             <p class="muted small">{{with .Event.Address}}{{.}}{{else}}We'll post the address once it's locked in.{{end}}</p>
           </div>
         </div>
-        <div class="info-row">
-          {{icon "group"}}
-          <div>
-            <p class="strong">{{if $g.Total}}{{$g.Total}} {{plural $g.Total "person" "people"}} coming{{else}}No RSVPs yet{{end}}</p>
-            <p class="muted small">{{with $g.Mine}}{{if .Going}}You're in{{with .Guests}} with {{len .}} more{{end}}.{{else}}You said you can't make it.{{end}}{{else}}You haven't RSVPed yet.{{end}}</p>
-          </div>
-        </div>
-        {{- if not $g.Mine}}
-        <a class="btn btn-primary" href="/details#rsvp">{{icon "celebration"}}RSVP now</a>
-        {{- end}}
         {{- if or (tbd .Event.Date) (tbd .Event.Location)}}
         <p class="note">{{icon "info"}}<span>Details are still cooking. Check back here for updates.</span></p>
         {{- end}}
-        <a class="link" href="/details">{{if $g.Mine}}Full details &amp; guest list{{else}}Full event details{{end}} {{icon "arrow-forward"}}</a>
+        <div class="info-row split">
+          {{icon "help" "ink-sage"}}
+          <span class="grow muted">Questions about the day?</span>
+          <a class="link" href="/details">Read the FAQ {{icon "arrow-forward"}}</a>
+        </div>
       </div>
     </div>
   </div>
@@ -54,10 +50,16 @@
 <div class="wrap section-gap">
   <div class="stats">
     <div class="stat">
-      <div class="stat-head"><span>Dishes pledged</span>{{icon "dinner-dining"}}</div>
+      <div class="stat-head"><span>Guest count</span>{{icon "group"}}</div>
+      <div class="stat-num"><strong>{{$g.Total}}</strong><span>{{plural $g.Total "person" "people"}} coming</span></div>
+      <div class="bar">{{if $g.Total}}<span class="tone-pumpkin" style="width: {{pct $g.Adults $g.Total}}%" title="Adults: {{$g.Adults}}"></span><span class="tone-sage" style="width: {{pct $g.Kids $g.Total}}%" title="Kids: {{$g.Kids}}"></span>{{end}}</div>
+      <p class="stat-foot split"><span class="stat-ok">{{icon "check-circle"}}{{$g.Adults}} {{plural $g.Adults "adult" "adults"}} • {{$g.Kids}} {{plural $g.Kids "kid" "kids"}}</span>{{with $g.Declined}}<span class="pill">{{len .}} can't make it</span>{{end}}</p>
+    </div>
+    <div class="stat">
+      <div class="stat-head"><span>Dishes pledged</span>{{icon "dinner-dining" "ink-cranberry"}}</div>
       <div class="stat-num"><strong class="ink-cranberry">{{$m.Total}}</strong><span>from {{$m.Cooks}} {{plural $m.Cooks "friend" "friends"}}</span></div>
       <div class="bar">{{range $m.Courses}}{{if .Dishes}}<span class="tone-{{.Tone}}" style="width: {{pct (len .Dishes) $m.Total}}%" title="{{.Plural}}: {{len .Dishes}}"></span>{{end}}{{end}}</div>
-      <p class="stat-foot">{{if $m.Missing}}{{icon "help"}}Still need {{courses $m.Missing}}{{else}}{{icon "check-circle"}}Every course is covered{{end}}</p>
+      <p class="stat-foot">{{if $m.Missing}}{{icon "warning" "ink-cranberry"}}Still need {{courses $m.Missing}}{{else}}{{icon "check-circle"}}Every course is covered{{end}}</p>
     </div>
     <div class="stat">
       <div class="stat-head"><span>Need the oven</span>{{icon "local-fire-department"}}</div>
@@ -66,29 +68,152 @@
       <p class="stat-foot"><a class="link" href="/potluck#oven">{{icon "schedule"}}See the oven lineup</a></p>
     </div>
     <div class="stat">
-      <div class="stat-head"><span>Courses covered</span>{{icon "restaurant"}}</div>
-      <div class="stat-num"><strong class="ink-sage">{{$m.Covered}}</strong><span>of {{len $m.Courses}} courses</span></div>
-      <div class="pips">{{range $m.Courses}}<span class="tone-{{.Tone}}{{if .Dishes}} on{{end}}" title="{{.Plural}}"></span>{{end}}</div>
-      <p class="stat-foot">{{range $i, $c := $m.Courses}}{{if $i}} · {{end}}<span{{if not $c.Dishes}} class="faint"{{end}}>{{$c.Plural}}</span>{{end}}</p>
-    </div>
-    <div class="stat">
-      <div class="stat-head"><span>Forum chatter</span>{{icon "forum"}}</div>
-      <div class="stat-num"><strong>{{.Counts.Threads}}</strong><span>{{plural .Counts.Threads "thread" "threads"}} · {{.Counts.Replies}} {{plural .Counts.Replies "reply" "replies"}}</span></div>
-      <p class="stat-foot">{{icon "chat-bubble"}}{{if .Counts.HasPosted}}Last post {{ago .Counts.LastPost}}{{else}}Be the first to post{{end}}</p>
+      <div class="stat-head"><span>Dietary notes</span>{{icon "eco" "ink-sage"}}</div>
+      {{- if $m.Tagged}}
+      <div class="tags">{{range $m.Tags}}{{if .N}}<span class="pill pill-lg {{if .Warn}}pill-warn{{else if eq .Key "gluten-free"}}pill-plain{{else}}pill-sage{{end}}">{{.Emoji}} {{.N}} {{.Label}}</span>{{end}}{{end}}</div>
+      {{- else}}
+      <p class="muted small">No dishes are tagged yet.</p>
+      {{- end}}
+      <p class="stat-foot">Tagged when dishes are added to the potluck</p>
     </div>
   </div>
 
   <div class="grid-12">
     <div class="span-7 stack-lg">
+      <section class="card card-lg anchor rsvp-card" id="rsvp">
+        <div class="rsvp-head">
+          <div class="grow">
+            <div class="eyebrow-row">
+              <span class="eyebrow">Family &amp; party RSVP</span>
+              {{- with $g.Mine}}{{if .Going}}<span class="pill pill-pumpkin">Party total: {{.Size}}</span>{{end}}{{end}}
+            </div>
+            <h2 class="h-md">Your RSVP &amp; party</h2>
+            <p class="muted small">Bringing family or a plus-one? Add the adults and kids in your party so we know how many seats to set.</p>
+          </div>
+          {{- with $g.Mine}}
+          {{- if .Going}}
+          <span class="status-badge going">{{icon "check-circle"}}Attending ({{.Adults}} {{plural .Adults "adult" "adults"}}{{if .Kids}}, {{.Kids}} {{plural .Kids "kid" "kids"}}{{end}})</span>
+          {{- else}}
+          <span class="status-badge">{{icon "no-food"}}Can't make it</span>
+          {{- end}}
+          {{- else}}
+          <span class="status-badge">{{icon "help"}}Not answered yet</span>
+          {{- end}}
+        </div>
+
+        <form class="rsvp-choice" method="post" action="/rsvp">
+          <p class="field-label">Are you feasting with us, {{.User}}?</p>
+          <div class="rsvp-options">
+            <button class="rsvp-option yes" type="submit" name="going" value="yes" aria-pressed="{{if and $g.Mine $g.Mine.Going}}true{{else}}false{{end}}">Yes, I'm in! 🥧</button>
+            <button class="rsvp-option no" type="submit" name="going" value="no" aria-pressed="{{if and $g.Mine (not $g.Mine.Going)}}true{{else}}false{{end}}">Can't make it 🍂</button>
+          </div>
+        </form>
+
+        {{- with $g.Mine}}{{if .Going}}
+        <div class="party-you">
+          <div class="party-you-head">
+            <span class="party-label">{{icon "person"}}Primary guest (you)</span>
+            <span class="pill pill-plain">Adult</span>
+          </div>
+          <p class="who">{{template "avatar" .Name}}<span>{{.Name}}</span></p>
+        </div>
+
+        <div class="party">
+          <div class="party-title">
+            {{icon "group" "ink-cranberry"}}
+            <h3 class="title-md">Party members</h3>
+            {{- with .Guests}}<span class="pill pill-warn">+{{len .}} added</span>{{end}}
+          </div>
+          {{- with .Guests}}
+          <ul class="party-list">
+            {{- range .}}
+            <li class="member{{if .Kid}} kid{{end}}">
+              {{template "avatar" .Name}}
+              <span class="grow">{{.Name}}</span>
+              <span class="pill {{if .Kid}}pill-sage{{else}}pill-pumpkin{{end}}">{{if .Kid}}Kid{{else}}Adult{{end}}</span>
+              <form method="post" action="/rsvp/guests/{{.ID}}/delete" data-confirm="Take {{.Name}} off the guest list?">
+                <button class="icon-btn danger" type="submit" aria-label="Remove {{.Name}}" title="Remove">{{icon "close"}}</button>
+              </form>
+            </li>
+            {{- end}}
+          </ul>
+          {{- end}}
+          <form class="guest-form" method="post" action="/rsvp/guests">
+            <div class="field">
+              <label for="guest-name">Add a guest or kid</label>
+              <input id="guest-name" name="name" value="{{$p.Form.Name}}" maxlength="40" required autocomplete="off" placeholder="Their name"{{if $p.Form.Error}} autofocus{{end}}>
+              {{- with $p.Form.Error}}<p class="field-error">{{.}}</p>{{end}}
+            </div>
+            <div class="guest-form-row">
+              <fieldset class="choices">
+                <legend class="sr-only">Adult or kid</legend>
+                <label class="choice choice-tag"><input type="radio" name="age" value="adult"{{if not $p.Form.Kid}} checked{{end}}><span>Adult</span></label>
+                <label class="choice choice-tag"><input type="radio" name="age" value="kid"{{if $p.Form.Kid}} checked{{end}}><span>Kid</span></label>
+              </fieldset>
+              <button class="btn btn-white" type="submit">{{icon "add" "ink-pumpkin"}}Add to party</button>
+            </div>
+          </form>
+        </div>
+
+        <p class="party-summary"><strong>Party summary:</strong> {{.Size}} {{plural .Size "seat" "seats"}} ({{.Adults}} {{plural .Adults "adult" "adults"}}, {{.Kids}} {{plural .Kids "kid" "kids"}})</p>
+        {{- end}}{{end}}
+      </section>
+
+      <section class="card card-lg anchor" id="guests">
+        <div class="card-title-row">
+          <div class="title-cluster">
+            <h2 class="h-sm">Who's joining the table?</h2>
+            <span class="pill pill-pumpkin">{{$g.Total}} {{plural $g.Total "guest" "guests"}} total</span>
+          </div>
+          {{- if $g.Total}}
+          <div class="legend">
+            <span><span class="dot tone-pumpkin"></span>{{$g.Adults}} {{plural $g.Adults "adult" "adults"}}</span>
+            <span><span class="dot tone-sage"></span>{{$g.Kids}} {{plural $g.Kids "kid" "kids"}}</span>
+          </div>
+          {{- end}}
+        </div>
+        {{- with $g.Going}}
+        <ul class="guest-grid">
+          {{- range .}}
+          <li class="guest-tile{{if same .Name $.User}} mine{{end}}">
+            <div class="guest-tile-head">
+              {{template "avatar" .Name}}
+              <div class="grow">
+                <p class="guest-name">{{.Name}}</p>
+                {{- with $p.Bringing .Name}}
+                <p class="bringing">{{range $i, $d := .}}{{if $i}}, {{end}}{{$d.Name}}{{end}}</p>
+                {{- else}}
+                <p class="bringing faint">No dish yet</p>
+                {{- end}}
+              </div>
+            </div>
+            <div class="tile-chips">
+              {{- with .AdultGuests}}<span class="chip">+{{len .}} {{plural (len .) "adult" "adults"}} ({{range $i, $x := .}}{{if $i}}, {{end}}{{$x.Name}}{{end}})</span>{{end}}
+              {{- with .KidGuests}}<span class="chip chip-kid">+{{len .}} {{plural (len .) "kid" "kids"}} ({{range $i, $x := .}}{{if $i}}, {{end}}{{$x.Name}}{{end}})</span>{{end}}
+              {{- if not .Guests}}<span class="chip">1 adult</span>{{end}}
+            </div>
+          </li>
+          {{- end}}
+        </ul>
+        {{- else}}
+        <div class="empty">
+          <span class="emoji" aria-hidden="true">🪑</span>
+          <p>No RSVPs yet. Be the first to pull up a chair.</p>
+        </div>
+        {{- end}}
+        {{- with $g.Declined}}
+        <p class="declined">{{icon "no-food"}}<span><strong>Can't make it:</strong> {{range $i, $r := .}}{{if $i}}, {{end}}{{$r.Name}}{{end}}</span></p>
+        {{- end}}
+      </section>
+    </div>
+
+    <div class="span-5 stack-lg">
       <section class="card card-lg">
         <div class="card-title-row">
-          <div>
-            <p class="eyebrow">Your plate</p>
-            <h2 class="h-md">What you're bringing</h2>
-          </div>
-          {{- if .Page.Mine}}<span class="pill pill-sage">{{icon "check-circle"}}{{len .Page.Mine}} {{plural (len .Page.Mine) "dish" "dishes"}} claimed</span>{{end}}
+          <h2 class="h-sm">{{icon "dinner-dining" "ink-pumpkin"}} What you're bringing</h2>
+          {{- with $p.Mine .User}}<span class="pill pill-sage">{{icon "check-circle"}}{{len .}} {{plural (len .) "dish" "dishes"}}</span>{{end}}
         </div>
-        {{- with .Page.Mine}}
+        {{- with $p.Mine .User}}
         <ul class="mini-list">
           {{- range .}}{{$c := category .Category}}
           <li class="mini-item">
@@ -101,7 +226,7 @@
           </li>
           {{- end}}
         </ul>
-        <a class="btn btn-white" href="/potluck#bring">{{icon "add"}}Bring something else</a>
+        <a class="btn btn-white btn-block" href="/potluck#bring">{{icon "add"}}Bring something else</a>
         {{- else}}
         <div class="empty">
           <span class="emoji" aria-hidden="true">🥧</span>
@@ -113,33 +238,10 @@
 
       <section class="card card-lg">
         <div class="card-title-row">
-          <h2 class="h-md">The menu so far</h2>
-          <span class="muted small">{{$m.Total}} {{plural $m.Total "dish" "dishes"}}</span>
+          <h2 class="h-sm">{{icon "forum" "ink-pumpkin"}} Latest from the forum</h2>
+          <span class="pill">{{.Counts.Threads}} {{plural .Counts.Threads "thread" "threads"}}</span>
         </div>
-        <ul class="course-list">
-          {{- range $m.Courses}}
-          <li class="course-row">
-            <span class="icon-bubble sm tone-{{.Tone}}">{{icon .Icon}}</span>
-            <div class="grow">
-              <h3>{{.Plural}} <span class="count">{{len .Dishes}}</span></h3>
-              {{- if .Dishes}}
-              <p>{{range $i, $d := .Dishes}}{{if $i}}, {{end}}{{$d.Name}} <span class="faint">({{$d.BroughtBy}})</span>{{end}}</p>
-              {{- else}}
-              <p>Nobody yet. <a class="link" href="/potluck?add={{.Key}}#bring">Claim one</a></p>
-              {{- end}}
-            </div>
-          </li>
-          {{- end}}
-        </ul>
-      </section>
-    </div>
-
-    <div class="span-5 stack-lg">
-      <section class="card card-lg">
-        <div class="card-title-row">
-          <h2 class="h-md">{{icon "forum" "ink-pumpkin"}} Latest from the forum</h2>
-        </div>
-        {{- with .Page.Threads}}
+        {{- with $p.Threads}}
         <ul class="thread-mini">
           {{- range .}}
           <li>
@@ -159,29 +261,18 @@
         {{- end}}
         <a class="btn btn-white btn-block" href="/forum">Open the forum {{icon "arrow-forward"}}</a>
       </section>
-
-      <section class="card card-lg card-tint">
-        <p class="eyebrow">The plan</p>
-        <h2 class="h-md">How this works</h2>
-        <ol class="how">
-          <li><span><strong>RSVP.</strong> Say you're coming and add anyone you're bringing.</span></li>
-          <li><span><strong>Claim a dish.</strong> Pick a course and tell us if it needs the oven.</span></li>
-          <li><span><strong>Check the gaps.</strong> The menu shows which courses still need someone.</span></li>
-          <li><span><strong>Talk it out.</strong> Rides, recipes, and games go in the forum.</span></li>
-        </ol>
-      </section>
     </div>
   </div>
 
   <section class="cta-band">
     <div>
-      <p class="eyebrow">Potluck coordination</p>
+      <p class="eyebrow ink-cranberry">Potluck coordination</p>
       <h2 class="h-lg">Have a recipe in mind for the feast?</h2>
       <p class="muted">{{if $m.Missing}}We still need {{courses $m.Missing}}. Claim a slot and let everyone know if it needs time in the oven.{{else}}Every course has something on it, but there's always room for one more pie.{{end}}</p>
     </div>
     <div class="cta-actions">
       <a class="btn btn-cranberry btn-lg" href="/potluck">Open the potluck board</a>
-      <a class="btn btn-white btn-lg" href="/forum#new">Start a forum thread</a>
+      <a class="btn btn-white btn-lg" href="/potluck#oven">See the oven lineup</a>
     </div>
   </section>
 </div>

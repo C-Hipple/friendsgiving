@@ -36,7 +36,7 @@
       </form>
 
       {{- range $p.Threads}}
-      <article class="card thread-card">
+      <article class="card card-lg thread-card">
         <div class="thread-meta">
           {{template "avatar" .Author}}
           <div class="grow">
@@ -50,8 +50,7 @@
         <p class="muted">{{excerpt . 240}}</p>
         {{- end}}
         <div class="thread-foot">
-          <span class="pill">{{icon "chat-bubble"}}{{.ReplyCount}} {{plural .ReplyCount "reply" "replies"}}</span>
-          <span class="link">Join thread {{icon "arrow-forward"}}</span>
+          <span class="link">{{.ReplyCount}} {{plural .ReplyCount "reply" "replies"}} {{icon "arrow-forward"}}</span>
         </div>
       </article>
       {{- else}}
@@ -90,6 +89,7 @@
         {{- else}}
         <p class="muted small">Nobody's signed up or posted yet.</p>
         {{- end}}
+        <a class="btn btn-white btn-block" href="/#guests">See who's coming {{icon "arrow-forward"}}</a>
       </section>
 
       <section class="card">

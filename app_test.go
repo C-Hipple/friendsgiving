@@ -179,9 +179,9 @@ func TestRSVP(t *testing.T) {
 	mike := loggedIn(t, srv, "Mike")
 	ctx := context.Background()
 
-	_, body := get(t, chris, srv.URL+"/details")
-	if !strings.Contains(body, "Are you coming?") || !strings.Contains(body, "No RSVPs yet") {
-		t.Fatal("details page doesn't ask for an RSVP before anyone answers")
+	_, body := get(t, chris, srv.URL+"/")
+	if !strings.Contains(body, "Not answered yet") || !strings.Contains(body, "No RSVPs yet") {
+		t.Fatal("overview doesn't ask for an RSVP before anyone answers")
 	}
 
 	post(t, chris, srv.URL+"/rsvp", url.Values{"going": {"yes"}})
@@ -201,11 +201,15 @@ func TestRSVP(t *testing.T) {
 		t.Fatalf("guest list = %+v", g)
 	}
 
-	_, body = get(t, mike, srv.URL+"/details")
-	for _, want := range []string{"Emma", "&lt;b&gt;Jordan&lt;/b&gt;", "Sam", "5 coming", "4 adults · 1 kid", "Can't make it:</strong> Mike"} {
+	_, body = get(t, mike, srv.URL+"/")
+	for _, want := range []string{"+1 kid (Emma)", "+1 adult (&lt;b&gt;Jordan&lt;/b&gt;)", "Sam", "5 guests total", "4 adults • 1 kid", "Can't make it:</strong> Mike", "5 friends attending"} {
 		if !strings.Contains(body, want) {
-			t.Errorf("details page is missing %q", want)
+			t.Errorf("overview is missing %q", want)
 		}
+	}
+	_, body = get(t, mike, srv.URL+"/details")
+	if !strings.Contains(body, "5 people are coming") {
+		t.Error("FAQ doesn't give the headcount")
 	}
 
 	// Same person under a differently cased name: one RSVP, not two.
