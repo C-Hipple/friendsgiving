@@ -52,10 +52,12 @@ func postBody(s string) string {
 	return strings.TrimSpace(strings.ReplaceAll(s, "\r\n", "\n"))
 }
 
-func (a *app) createThread(w http.ResponseWriter, r *http.Request) {
+// newThreadForm tidies a new thread from the web form or an MCP tool, and
+// checks it.
+func newThreadForm(title, body string) threadForm {
 	f := threadForm{
-		Title:  strings.Join(strings.Fields(r.FormValue("title")), " "),
-		Body:   postBody(r.FormValue("body")),
+		Title:  strings.Join(strings.Fields(title), " "),
+		Body:   postBody(body),
 		Errors: map[string]string{},
 	}
 	switch n := utf8.RuneCountInString(f.Title); {
@@ -67,6 +69,22 @@ func (a *app) createThread(w http.ResponseWriter, r *http.Request) {
 	if utf8.RuneCountInString(f.Body) > maxPostLen {
 		f.Errors["body"] = "That's a lot of words. Keep it under 5,000 characters."
 	}
+	return f
+}
+
+// replyError says what's wrong with a reply's body, if anything.
+func replyError(body string) string {
+	switch n := utf8.RuneCountInString(body); {
+	case n == 0:
+		return "Write something first."
+	case n > maxPostLen:
+		return "That's a lot of words. Keep it under 5,000 characters."
+	}
+	return ""
+}
+
+func (a *app) createThread(w http.ResponseWriter, r *http.Request) {
+	f := newThreadForm(r.FormValue("title"), r.FormValue("body"))
 	if len(f.Errors) > 0 {
 		a.renderForum(w, r, http.StatusUnprocessableEntity, f)
 		return
@@ -131,16 +149,11 @@ func (a *app) createReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body := postBody(r.FormValue("body"))
-	switch n := utf8.RuneCountInString(body); {
-	case n == 0:
-		a.renderThread(w, r, http.StatusUnprocessableEntity, threadPage{Thread: t, ReplyErr: "Write something first."})
-		return
-	case n > maxPostLen:
-		a.renderThread(w, r, http.StatusUnprocessableEntity, threadPage{Thread: t, Reply: body,
-			ReplyErr: "That's a lot of words. Keep it under 5,000 characters."})
+	if msg := replyError(body); msg != "" {
+		a.renderThread(w, r, http.StatusUnprocessableEntity, threadPage{Thread: t, Reply: body, ReplyErr: msg})
 		return
 	}
-	if err := a.store.CreateReply(r.Context(), Reply{ThreadID: t.ID, Body: body, Author: userName(r)}); err != nil {
+	if _, err := a.store.CreateReply(r.Context(), Reply{ThreadID: t.ID, Body: body, Author: userName(r)}); err != nil {
 		a.serverError(w, r, err)
 		return
 	}

@@ -12,6 +12,9 @@ A small, private coordination site for Thanksgiving: a potluck sign-up board
 - **No accounts**: friends enter the shared password and a name. The name lives
   in a cookie, and people can edit or delete only the dishes and posts under
   their current name.
+- **Bring your Claude**: an MCP server at `/mcp` lets Claude (or any MCP
+  client) read the plan, claim dishes, and post in the forum. Setup steps are
+  at `/mcp/docs`, linked from the footer.
 
 It's a single Go binary with SQLite, server-rendered HTML, one stylesheet,
 self-hosted fonts and icons, and a few lines of optional JavaScript. Pages
@@ -50,6 +53,22 @@ To change event details later, edit `.env` and run `docker compose up -d`.
 | `TZ`             | `UTC`                | Timezone for hover timestamps                 |
 | `ADDR`           | `:8080`              | Listen address inside the container           |
 | `DB_PATH`        | `/data/brogiving.db` | SQLite file                                   |
+
+## MCP
+
+`/mcp` speaks the Model Context Protocol's Streamable HTTP transport,
+statelessly: one JSON-RPC message per POST, one JSON reply, no sessions or
+streams. It skips the cookie gate and takes the same `SITE_PASSWORD` instead,
+either as HTTP Basic auth (any name as the username) or as query parameters
+for apps that only take a URL:
+
+```sh
+claude mcp add --transport http brogiving 'https://your-site/mcp?name=Chris&password=...'
+```
+
+The name is who Claude posts as, with the same ownership rules as the site.
+Tools cover the event details, the potluck (list, add, update, remove
+dishes), the forum (list, read, start, reply, delete), and who's involved.
 
 ## Develop
 

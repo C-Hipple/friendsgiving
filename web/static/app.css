@@ -53,6 +53,7 @@
 
   --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
   --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 /* ---------- base ---------- */
@@ -76,6 +77,7 @@ ul, ol { padding: 0; list-style: none; }
 a { color: inherit; text-decoration: none; }
 svg { display: block; }
 button, input, textarea, select { font: inherit; color: inherit; }
+code { font-family: var(--font-mono); font-size: .9em; overflow-wrap: anywhere; }
 button { cursor: pointer; }
 fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 legend { padding: 0; }
@@ -743,6 +745,17 @@ textarea:focus { outline: none; border-color: var(--primary-container); box-shad
 .reply-meta form { margin-left: auto; }
 .reply .post-body { font-size: .9375rem; }
 
+/* ---------- claude (mcp docs) ---------- */
+
+.code {
+  margin: 0; padding: .875rem 1rem; border-radius: .875rem;
+  background: var(--inverse-surface); color: var(--inverse-on-surface);
+  font: 500 .8125rem/1.6 var(--font-mono);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.code code { font-size: inherit; user-select: all; } /* one click selects it all */
+.code [data-slot] { color: #ffd27a; }
+
 /* ---------- gate (login, name) ---------- */
 
 body.bare { background: var(--secondary); }
@@ -782,6 +795,7 @@ body.bare { background: var(--secondary); }
 .footer-grid a { color: var(--secondary); font-size: .875rem; font-weight: 600; }
 .footer-grid a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .footer-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem 2rem; margin-top: 2.5rem; font-size: .75rem; font-weight: 600; color: var(--on-surface-variant); }
+.footer-bottom a { color: var(--secondary); text-decoration: underline; text-underline-offset: 3px; }
 @media (min-width: 640px) {
   .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
