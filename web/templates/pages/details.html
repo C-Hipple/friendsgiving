@@ -8,7 +8,7 @@
     </div>
     <div class="head-chips">
       <div class="mini-stat">{{icon "calendar-month" "ink-pumpkin"}}<div><span class="label-sm muted">Date</span><strong>{{if tbd .Event.Date}}TBD{{else}}{{.Event.Date}}{{end}}</strong></div></div>
-      <div class="mini-stat">{{icon "location-on" "ink-cranberry"}}<div><span class="label-sm muted">Location</span><strong>{{if tbd .Event.Location}}TBD{{else}}{{.Event.Location}}{{end}}</strong></div></div>
+      <div class="mini-stat">{{icon "location-on" "ink-cranberry"}}<div><span class="label-sm muted">Location</span><strong>{{if tbd .Event.Location}}TBD{{else}}{{.Event.Location}}{{end}}</strong>{{with .Event.Address}}<a class="link small" href="{{mapsURL .}}" target="_blank" rel="noopener">{{.}}</a>{{end}}</div></div>
     </div>
   </div>
 </section>
@@ -42,7 +42,7 @@
           {{- if tbd .Event.Location}}
           <p>We haven't picked a spot yet. The address will show up here once we have.</p>
           {{- else}}
-          <p><strong>{{.Event.Location}}</strong>{{with .Event.Address}}, {{.}}{{end}}</p>
+          <p><strong>{{.Event.Location}}</strong>{{with .Event.Address}}, <a class="link" href="{{mapsURL .}}" target="_blank" rel="noopener">{{.}}</a>{{end}}</p>
           {{- end}}
           {{- with .Event.Address}}
           <a class="btn btn-white" href="{{mapsURL .}}" target="_blank" rel="noopener">{{icon "map" "ink-cranberry"}}Open in Maps</a>

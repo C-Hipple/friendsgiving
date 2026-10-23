@@ -31,7 +31,7 @@
           {{icon "location-on"}}
           <div>
             <p class="strong">{{template "place" .Event}}</p>
-            <p class="muted small">{{with .Event.Address}}{{.}}{{else}}We'll post the address once it's locked in.{{end}}</p>
+            <p class="muted small">{{with .Event.Address}}<a class="link" href="{{mapsURL .}}" target="_blank" rel="noopener">{{.}}</a>{{else}}We'll post the address once it's locked in.{{end}}</p>
           </div>
         </div>
         {{- if or (tbd .Event.Date) (tbd .Event.Location)}}
