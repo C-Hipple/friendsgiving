@@ -8,6 +8,9 @@ primary_region = 'ewr'
 
 [build]
 
+[env]
+  EVENT_DATE = 'Saturday, December 5, 2026'
+
 [[mounts]]
   source = 'data'
   destination = '/data'
