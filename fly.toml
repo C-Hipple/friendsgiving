@@ -9,7 +9,7 @@ primary_region = 'ewr'
 [build]
 
 [env]
-  EVENT_DATE = 'Saturday, December 5, 2026'
+  EVENT_DATE = 'Saturday, November 28, 2026'
 
 [[mounts]]
   source = 'data'
