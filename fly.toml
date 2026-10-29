@@ -10,6 +10,7 @@ primary_region = 'ewr'
 
 [env]
   EVENT_DATE = 'Saturday, November 28, 2026'
+  EVENT_TIME = '2:00 PM'
 
 [[mounts]]
   source = 'data'
