@@ -53,7 +53,17 @@
       <div class="stat-head"><span>Guest count</span>{{icon "group"}}</div>
       <div class="stat-num"><strong>{{$g.Total}}</strong><span>{{plural $g.Total "person" "people"}} coming</span></div>
       <div class="bar">{{if $g.Total}}<span class="tone-pumpkin" style="width: {{pct $g.Adults $g.Total}}%" title="Adults: {{$g.Adults}}"></span><span class="tone-sage" style="width: {{pct $g.Kids $g.Total}}%" title="Kids: {{$g.Kids}}"></span>{{end}}</div>
-      <p class="stat-foot split"><span class="stat-ok">{{icon "check-circle"}}{{$g.Adults}} {{plural $g.Adults "adult" "adults"}} • {{$g.Kids}} {{plural $g.Kids "kid" "kids"}}</span>{{with $g.Declined}}<span class="pill">{{len .}} can't make it</span>{{end}}</p>
+      {{- if or $g.Going $g.Declined}}
+      <div class="stat-who">
+        {{- with $g.Going}}
+        <p><strong>Coming:</strong> <a href="#guests">{{range $i, $r := .}}{{if $i}}, {{end}}{{$r.Name}}{{range $r.Guests}}, {{.Name}}{{end}}{{end}}</a></p>
+        {{- end}}
+        {{- with $g.Declined}}
+        <p><strong>Can't make it:</strong> <a href="#declined">{{range $i, $r := .}}{{if $i}}, {{end}}{{$r.Name}}{{end}}</a></p>
+        {{- end}}
+      </div>
+      {{- end}}
+      <p class="stat-foot"><span class="stat-ok">{{icon "check-circle"}}{{$g.Adults}} {{plural $g.Adults "adult" "adults"}} • {{$g.Kids}} {{plural $g.Kids "kid" "kids"}}</span></p>
     </div>
     <div class="stat">
       <div class="stat-head"><span>Dishes pledged</span>{{icon "dinner-dining" "ink-cranberry"}}</div>
@@ -202,13 +212,13 @@
         </div>
         {{- end}}
         {{- with $g.Declined}}
-        <p class="declined">{{icon "no-food"}}<span><strong>Can't make it:</strong> {{range $i, $r := .}}{{if $i}}, {{end}}{{$r.Name}}{{end}}</span></p>
+        <p class="declined anchor" id="declined">{{icon "no-food"}}<span><strong>Can't make it:</strong> {{range $i, $r := .}}{{if $i}}, {{end}}{{$r.Name}}{{end}}</span></p>
         {{- end}}
       </section>
     </div>
 
     <div class="span-5 stack-lg">
-      <section class="card card-lg">
+      <section class="card card-lg anchor" id="bringing">
         <div class="card-title-row">
           <h2 class="h-sm">{{icon "dinner-dining" "ink-pumpkin"}} What you're bringing</h2>
           {{- with $p.Mine .User}}<span class="pill pill-sage">{{icon "check-circle"}}{{len .}} {{plural (len .) "dish" "dishes"}}</span>{{end}}
@@ -226,6 +236,10 @@
             <a class="pill {{if .AwaitingReply}}pill-new{{else}}pill-plain{{end}}" href="/potluck/{{.ID}}#comments"{{if .AwaitingReply}} title="New comment from {{.LastCommentBy}}"{{end}} aria-label="{{.Comments}} {{plural .Comments "comment" "comments"}} on {{.Name}}">{{icon "chat-bubble"}}{{.Comments}}</a>
             {{- end}}
             <a class="icon-btn" href="/potluck/{{.ID}}/edit" aria-label="Edit {{.Name}}" title="Edit">{{icon "edit"}}</a>
+            <form method="post" action="/potluck/{{.ID}}/delete" data-confirm="Take {{.Name}} off the menu?">
+              <input type="hidden" name="next" value="/#bringing">
+              <button class="icon-btn danger" type="submit" aria-label="Remove {{.Name}}" title="Remove">{{icon "delete"}}</button>
+            </form>
           </li>
           {{- end}}
         </ul>

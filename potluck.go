@@ -395,7 +395,11 @@ func (a *app) deleteDish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setFlash(w, r, d.Name+" is off the menu.")
-	http.Redirect(w, r, "/potluck", http.StatusSeeOther)
+	next := "/potluck"
+	if p := r.FormValue("next"); p != "" {
+		next = localPath(p)
+	}
+	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
 type dishPage struct {

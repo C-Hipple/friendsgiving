@@ -133,7 +133,14 @@ func TestDishOwnership(t *testing.T) {
 	if d, _ := store.GetDish(context.Background(), 1); d.Name != "Smoked Turkey" || d.NeedsOven || d.OvenNotes != "" {
 		t.Fatalf("after owner edit: %+v", d)
 	}
-	post(t, chris, srv.URL+"/potluck/1/delete", nil)
+	// The overview offers to remove it, and sends Chris back there afterward.
+	if _, body := get(t, chris, srv.URL+"/"); !strings.Contains(body, `action="/potluck/1/delete"`) {
+		t.Error("overview doesn't let Chris remove their dish")
+	}
+	resp := post(t, chris, srv.URL+"/potluck/1/delete", url.Values{"next": {"/#bringing"}})
+	if loc := resp.Header.Get("Location"); loc != "/#bringing" {
+		t.Errorf("after delete from the overview: Location %q, want /#bringing", loc)
+	}
 	if _, err := store.GetDish(context.Background(), 1); err != errNotFound {
 		t.Fatalf("after delete: err = %v", err)
 	}
@@ -256,7 +263,10 @@ func TestRSVP(t *testing.T) {
 	}
 
 	_, body = get(t, mike, srv.URL+"/")
-	for _, want := range []string{"+1 kid (Emma)", "+1 adult (&lt;b&gt;Jordan&lt;/b&gt;)", "Sam", "5 guests total", "4 adults • 1 kid", "Can't make it:</strong> Mike", "5 friends attending"} {
+	for _, want := range []string{"+1 kid (Emma)", "+1 adult (&lt;b&gt;Jordan&lt;/b&gt;)", "Sam", "5 guests total", "4 adults • 1 kid", "Can't make it:</strong> Mike", "5 friends attending",
+		// The guest count card names everyone, guests included.
+		`Coming:</strong> <a href="#guests">Chris, Emma, &lt;b&gt;Jordan&lt;/b&gt;, Dave, Sam</a>`,
+		`Can't make it:</strong> <a href="#declined">Mike</a>`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("overview is missing %q", want)
 		}

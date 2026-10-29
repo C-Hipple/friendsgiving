@@ -491,6 +491,10 @@ a.pill:hover { filter: brightness(.96); }
 .pips { display: flex; gap: .375rem; }
 .pips span { flex: 1; height: .5rem; border-radius: 999px; background: var(--surface-high); }
 .pips span.on { background: var(--tone); }
+.stat-who { display: grid; gap: .375rem; font-size: .8125rem; color: var(--on-surface-variant); }
+.stat-who p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; }
+.stat-who strong { color: var(--on-surface); }
+.stat-who a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .stat-foot { display: flex; align-items: center; gap: .375rem; flex-wrap: wrap; margin-top: auto; font-size: .75rem; font-weight: 700; color: var(--on-surface-variant); }
 .stat-foot .icon { width: 1rem; height: 1rem; color: var(--primary-container); }
 .stat-foot .link { font-size: .75rem; }
